@@ -26,11 +26,11 @@ NullMoth's Metal plugin and translator, Mesa ANV) with the E16 changes in this r
 ## What is in here
 
 ```
+driver/                        full XeGfx driver source (WTLIntelGfx 0.0.47 + every E16 change), see driver/E16-README.md
 patches/wtlintelgfx-e16.diff   every source change on top of WTLIntelGfx ff64f83 (core, accel, plugin, translator)
 scripts/                       bring-up (xe-up.sh), build + install scripts used on the Mac and the laptop
 scripts/0008-e16.patch         ArrowWhatever's GGTT flip-slot core patch, path-rewritten for this tree
 scripts/arc/                   ArcMTL experiment: opt-in ArcXe, Mesa ANV cross-build, test + install
-src/XeGfxIntelFB/              XeGfxIntelFB 0.9.4 (panel timing, NVRMTiming, detailed timings)
 src/E16ConsoleRange/           small helper kext used during bring-up
 src/probe/                     CVDisplayLink refresh probe
 docs/                          how it works, how to build, what was measured, what failed

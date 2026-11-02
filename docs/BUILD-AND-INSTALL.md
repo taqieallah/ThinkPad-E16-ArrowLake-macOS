@@ -13,7 +13,7 @@ laptop on the OpenCore USB stick (`/Volumes/1401/xegfx-e16`). The laptop has no 
                      drm-kmod c16de0f9fa84f70b9551f69fde837a7f3a73c0e9, GuC firmware
 ```
 
-Apply the E16 changes: `cd ~/src/xe-e16/wtl && git apply /path/to/patches/wtlintelgfx-e16.diff`
+Either copy `driver/` to `~/src/xe-e16/wtl`, or apply the diff to a WTLIntelGfx clone: `git apply patches/wtlintelgfx-e16.diff`
 (the flip core file `xkpi/src/i915/xg_i915_flip.c` is created by the same diff).
 
 ## The laptop's kernel collection

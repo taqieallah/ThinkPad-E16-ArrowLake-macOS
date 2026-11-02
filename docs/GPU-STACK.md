@@ -64,7 +64,7 @@ Refuses to run when ArcXe owns the GPU (ArcMTL test boot).
 ### Translator
 NullMoth v2.6.6 + `LlType::Half` arm (A-41).
 
-### XeGfxIntelFB 0.9.4 (src/XeGfxIntelFB)
+### XeGfxIntelFB 0.9.4 (driver/kexts/XeGfxIntelFB)
 - reads the panel timing from the EDID detailed timing or the transcoder (0x60000 / 0x6f000)
 - publishes `NVRMTiming` (13 words: tag `0x4b350001`, pclk, hact/hss/hse/htot, vact/vss/vse/vtot, mHz, h+, v+)
 - answers `getTimingInfoForDisplayMode` with a detailed timing for the native mode (min = max pixel clock);

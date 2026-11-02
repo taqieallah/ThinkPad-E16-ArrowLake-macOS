@@ -11,7 +11,8 @@ license of the file it changes, per WTLIntelGfx's NOTICE:
                                                      Required Notice: Copyright (c) 2026 NullMoth Systems
                                                      (https://nullmothsystems.com)
   translator/ ...................................... LGPL-3.0
-src/XeGfxIntelFB/intelfb.cpp is XeGfxIntelFB (BSD 2-Clause, watchthelight) with E16 changes.
+driver/ is WTLIntelGfx ff64f83 with the E16 changes applied; its own NOTICE gives the licence per folder.
+driver/kexts/XeGfxIntelFB/intelfb.cpp is XeGfxIntelFB 0.9.4 (BSD 2-Clause, watchthelight) with E16 changes.
 scripts/0008-e16.patch is ArrowWhatever's 0008-core-ggtt-flip-slots.patch, path-rewritten (see its header).
 scripts/arc/patch-arcxe-e16.py patches longurara/ArcMTL (PolyForm Noncommercial 1.0.0 for NullMoth-derived parts).
 
