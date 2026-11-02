@@ -40,6 +40,7 @@ No Apple binaries, firmware, kernel collections or SMBIOS data are included.
 
 ## Read next
 
+- [HANDOFF.md](HANDOFF.md): **current state and next steps (start here to continue)**
 - [docs/HARDWARE-AND-OPENCORE.md](docs/HARDWARE-AND-OPENCORE.md): BIOS, ACPI patches, kexts, boot-args
 - [docs/GPU-STACK.md](docs/GPU-STACK.md): how the XeGfx stack is put together and every E16 change
 - [docs/BUILD-AND-INSTALL.md](docs/BUILD-AND-INSTALL.md): building on an Apple Silicon Mac, installing on the laptop
