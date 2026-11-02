@@ -1,0 +1,18 @@
+ThinkPad E16 Arrow Lake Hackintosh - E16 changes and tooling
+Copyright (c) 2026, taqieallah
+
+Written for this repository (scripts/, docs/, src/probe/, src/E16ConsoleRange/): BSD 2-Clause (LICENSE).
+
+patches/wtlintelgfx-e16.diff modifies watchthelight-labs/WTLIntelGfx (commit ff64f83). Each hunk keeps the
+license of the file it changes, per WTLIntelGfx's NOTICE:
+  shim/, tools/, kexts/XeGfxIntelFB/ ............... BSD 2-Clause (watchthelight)
+  xkpi/ ............................................ per file (MIT / BSD-2), see WTLIntelGfx xkpi/NOTICE.md
+  plugin/, kexts/XeGfxAccel/ ....................... PolyForm Noncommercial 1.0.0
+                                                     Required Notice: Copyright (c) 2026 NullMoth Systems
+                                                     (https://nullmothsystems.com)
+  translator/ ...................................... LGPL-3.0
+src/XeGfxIntelFB/intelfb.cpp is XeGfxIntelFB (BSD 2-Clause, watchthelight) with E16 changes.
+scripts/0008-e16.patch is ArrowWhatever's 0008-core-ggtt-flip-slots.patch, path-rewritten (see its header).
+scripts/arc/patch-arcxe-e16.py patches longurara/ArcMTL (PolyForm Noncommercial 1.0.0 for NullMoth-derived parts).
+
+No commercial use of the PolyForm Noncommercial parts. No Apple binaries, firmware or kernel collections.

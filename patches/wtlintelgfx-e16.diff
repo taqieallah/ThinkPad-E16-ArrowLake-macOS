@@ -1,0 +1,940 @@
+diff --git a/kexts/XeGfxAccel/accel/nvaccel_stubs.h b/kexts/XeGfxAccel/accel/nvaccel_stubs.h
+index b5be732..ee77a4c 100644
+--- a/kexts/XeGfxAccel/accel/nvaccel_stubs.h
++++ b/kexts/XeGfxAccel/accel/nvaccel_stubs.h
+@@ -153,6 +153,7 @@ public:
+     unsigned fIopNext;
+     const void *iopMapSurface(unsigned id, IOMemoryDescriptor *md, unsigned long long need);
+     void        iopDropSources();
++    bool        xeCopyNow(IOService *fb, unsigned head, IOSurface *s);   // E16: the async panel copy
+ };
+ OSDefineMetaClassAndStructors(NVDisplayPipe, IOAccelLegacyDisplayPipe)
+ class NVGLContext : public IOAccelGLContext2 {
+diff --git a/kexts/XeGfxAccel/accel/nvrm-accel.cpp b/kexts/XeGfxAccel/accel/nvrm-accel.cpp
+index 53f52af..2d343fd 100644
+--- a/kexts/XeGfxAccel/accel/nvrm-accel.cpp
++++ b/kexts/XeGfxAccel/accel/nvrm-accel.cpp
+@@ -31,6 +31,10 @@
+ #include "IOAccelTask.h"
+ #include "IOAccelMemoryMap.h"
+ #include "../nvrm_gpuva_abi.h"
++#ifndef NVRM_SS_KERNEL_ABI
++#define NVRM_SS_KERNEL_ABI 1
++#endif
++#include "../nvrm_surfshare_abi.h"   // E16: XGDR selector 1 builds a surface escape
+ class NVMemoryMap;
+ static unsigned long long nvAccelGpuVaAlloc(IOAccelMemoryMap *map,
+                                            unsigned long long len, unsigned long long align);
+@@ -231,6 +235,24 @@ public:
+     IOReturn externalMethod(uint32_t sel, IOExternalMethodArguments *a, IOExternalMethodDispatch *,
+                             OSObject *, void *) APPLE_KEXT_OVERRIDE {
+         static IOService *res;
++        // E16 (ArrowWhatever K9 idea, on NullMoth's own swap wait): selector 1 = WindowServer completion mark
++        // (surface id, pending). NVIDIA sends it through NVK's surface escape; Intel has no NVK, so the plugin sends it
++        // here. Same handler as that escape: only WindowServer's marks are taken, the swap then waits in the kernel
++        // (nvSurfWaitReady before the panel copy) instead of WindowServer waiting for every composite.
++        if (sel == 1) {
++            if (a->scalarInputCount != 2 || a->scalarOutputCount != 1) return kIOReturnBadArgument;
++            static IOService *acc;
++            if (!acc) { OSDictionary *m = serviceMatching("NMXAccel"); if (m) acc = waitForMatchingService(m, 1000ULL * 1000 * 1000); }
++            if (!acc) return kIOReturnNotAttached;
++            struct NVRMSurfShareEsc e; bzero(&e, sizeof e);
++            e.version = NVRM_SURFSHARE_VERSION; e.surfaceID = (unsigned)a->scalarInput[0];
++            e.plane = NVRM_SS_PLANE_GPU_MARK | (a->scalarInput[1] ? 1u : 0u); e.status = NVRM_SS_OFF;
++            const OSSymbol *fn = OSSymbol::withCStringNoCopy(NVACCEL_SS_FN);
++            IOReturn r = fn ? acc->callPlatformFunction(fn, false, &e, nullptr, (void *)(uintptr_t)NVRM_ESC_SURF_DIRTY, nullptr) : kIOReturnNoMemory;
++            if (fn) fn->release();
++            a->scalarOutput[0] = (uint64_t)e.status;
++            return r;
++        }
+         if (sel != 0 || a->scalarInputCount != 3 || a->scalarOutputCount != 1) return kIOReturnBadArgument;
+         if (!res) { OSDictionary *m = serviceMatching("XeGfxResident"); if (m) res = waitForMatchingService(m, 1000ULL * 1000 * 1000); }
+         if (!res) return kIOReturnNotAttached;
+@@ -1276,9 +1298,16 @@ void NVDisplayPipe::iopDropSources()
+     }
+ }
+ 
++#ifdef NMX_XEGFX
++static bool nvXeFlipIsLive(void);
++static void nvXeFlipHome(void);
++#endif
+ void NVDisplayPipe::free()
+ {
+     iopDropSources();
++#ifdef NMX_XEGFX
++    if (nvXeFlipIsLive()) nvXeFlipHome();   // E16: never leave the plane on a slot whose frame is going away
++#endif
+     IOAccelLegacyDisplayPipe::free();
+ }
+ 
+@@ -1313,10 +1342,15 @@ IOReturn NVDisplayPipe::validateTransaction(IOAccelDisplayPipeTransaction2 *)
+ }
+ 
+ static bool nvAccelIopAsyncBusy(const void *pipe);
++static bool nvXeCopyBusy(const void *pipe);
++static bool nvXeCopyQueue(NVDisplayPipe *pipe, IOService *fb, unsigned head, IOSurface *s);
++static int gXeAsyncCopy = 1;
++static int gXeCopyHold = 0;   // E16: 1 = the transaction stays incomplete until the worker has copied it
++static int nvXeFlipOn(void);
+ bool NVDisplayPipe::isTransactionComplete(IOAccelDisplayPipeTransaction2 *)
+ {
+     NVPIPE_CNT(gCntPipeComplete);
+-    return gNvIop != 0 && !nvAccelIopAsyncBusy(this);
++    return gNvIop != 0 && !nvAccelIopAsyncBusy(this) && !((gXeCopyHold || nvXeFlipOn()) && nvXeCopyBusy(this));
+ }
+ 
+ static void nvAccelSurfScanoutSync(IOSurface *s);
+@@ -1569,10 +1603,18 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
+         OSAddAtomic64(1, &gCntIopSrcSurf); OSAddAtomic64(1, &gCntIopOk); OSAddAtomic64(1, &gCntIopOkHead[head]);
+         return kIOReturnSuccess;
+     } else if (s) {
++#ifdef NMX_XEGFX
++        // E16: the copy runs on a worker (waits for the composite, the vblank, then copies) and the transaction
++        // completes through signalTransactionInterrupt, as the NVIDIA async flip does. WindowServer is not held.
++        if (head == 4 && gXeAsyncCopy && nvXeCopyQueue(this, fb, head, s)) return kIOReturnSuccess;
++#endif
+         // A copied frame must come from the surface's newest pixels. Copying while they were still only in VRAM put a
+         // stale, one-colour buffer on the panel every other frame: full-screen flicker, 5 of 40 flicker recordings
+         // (1.13-1.14.1), nvaccel_iop_blank about half of every copied frame, never on machines whose frames all flip.
+         // Such a frame now keeps the previous picture on the panel instead.
++#ifdef NMX_XEGFX
++        if (nvXeFlipIsLive()) nvXeFlipHome();   // E16: copying into the firmware framebuffer again
++#endif
+         nvSurfWaitReady(s->getSurfaceID());   // a copied frame is read here, so its GPU work must be done first
+         if (!nvAccelSurfCopyReady(s, head)) return kIOReturnSuccess;
+         const unsigned fmt = s->getPixelFormat();
+@@ -1890,6 +1932,23 @@ static void nvaccelInstallSysctl(void)
+           sysctl__debug_nvaccel_pipe_complete, sysctl__debug_nvaccel_pipe_perform;
+       sysctl_register_oid(&sysctl__debug_nvaccel_pipe_init);     sysctl_register_oid(&sysctl__debug_nvaccel_pipe_validate);
+       sysctl_register_oid(&sysctl__debug_nvaccel_pipe_complete); sysctl_register_oid(&sysctl__debug_nvaccel_pipe_perform); }
++    { extern struct sysctl_oid sysctl__debug_nvaccel_xe_async_copy, sysctl__debug_nvaccel_xe_copy_queued, sysctl__debug_nvaccel_xe_copy_done,
++          sysctl__debug_nvaccel_xe_copy_dropped, sysctl__debug_nvaccel_xe_copy_fail, sysctl__debug_nvaccel_xe_copy_us, sysctl__debug_nvaccel_xe_copy_us_max;
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_async_copy); { extern struct sysctl_oid sysctl__debug_nvaccel_xe_copy_hold; sysctl_register_oid(&sysctl__debug_nvaccel_xe_copy_hold); } sysctl_register_oid(&sysctl__debug_nvaccel_xe_copy_queued);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_copy_done);  sysctl_register_oid(&sysctl__debug_nvaccel_xe_copy_dropped);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_copy_fail);  sysctl_register_oid(&sysctl__debug_nvaccel_xe_copy_us);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_copy_us_max); }   // E16 async copy
++    { extern struct sysctl_oid sysctl__debug_nvaccel_xe_flip, sysctl__debug_nvaccel_xe_flip_clflush, sysctl__debug_nvaccel_xe_flips,
++          sysctl__debug_nvaccel_xe_flip_miss, sysctl__debug_nvaccel_xe_flip_fail, sysctl__debug_nvaccel_xe_flip_home;
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_clflush);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_flips); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_miss);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_fail); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_home); }   // E16 flip
++    { extern struct sysctl_oid sysctl__debug_nvaccel_xe_k9, sysctl__debug_nvaccel_xe_idle_ms, sysctl__debug_nvaccel_xe_k9_free,
++          sysctl__debug_nvaccel_xe_k9_mark, sysctl__debug_nvaccel_xe_k9_idle, sysctl__debug_nvaccel_xe_k9_forced, sysctl__debug_nvaccel_xe_k9_max_us;
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9); sysctl_register_oid(&sysctl__debug_nvaccel_xe_idle_ms);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_free); sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_mark);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_idle); sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_forced);
++      sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_max_us); }   // E16 K9b
+     nvXeTraceStart();
+ #endif
+     sysctl_register_oid(&sysctl__debug_nvaccel_heads_published); sysctl_register_oid(&sysctl__debug_nvaccel_heads_registered);
+@@ -1967,7 +2026,9 @@ static IOReturn nvAccelGpuVaCall(const char *fn, struct NVRMGpuVaRequest *g)
+     return r;
+ }
+ 
++#ifndef NVRM_SS_KERNEL_ABI
+ #define NVRM_SS_KERNEL_ABI 1
++#endif
+ #include "../nvrm_surfshare_abi.h"
+ extern "C" {
+ void *_ZN13IOSurfaceRoot13lookupSurfaceEjP4task(void *root, unsigned int id, task_t task);
+@@ -3010,6 +3071,261 @@ static bool nvAccelFlipTo(IOAccelResource2 *res)
+     return true;
+ }
+ 
++#ifdef NMX_XEGFX
++// ---- E16: asynchronous panel copy for the Intel head (ArrowWhatever's K9 idea on the copy path) ----------------------
++// performTransaction queues the surface and returns; this worker waits for WindowServer's composite (nvSurfWaitReady,
++// fed by the XGDR completion marks), then the vblank, copies, and signals the pipe. A frame that arrives while one is
++// still being copied replaces the queued one (newest wins, counted in xe_copy_dropped).
++static SInt64 gCntXeCopyQueued, gCntXeCopyDone, gCntXeCopyDropped, gCntXeCopyFail;
++static int gXeCopyLastUs, gXeCopyMaxUs;
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_async_copy, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeAsyncCopy, 0, "E16: 1 = the Intel panel copy runs on a worker and WindowServer is not held (0 = in the transaction, as before)");
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_copy_hold, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeCopyHold, 0, "E16: 1 = WindowServer waits for the worker before its next swap; 0 = done at once, the worker shows the newest frame");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_copy_queued, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeCopyQueued, "E16: frames handed to the copy worker");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_copy_done, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeCopyDone, "E16: frames the worker put on the panel");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_copy_dropped, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeCopyDropped, "E16: queued frames replaced by a newer one");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_copy_fail, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeCopyFail, "E16: worker copies that failed");
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_copy_us, CTLFLAG_RD | CTLFLAG_LOCKED, &gXeCopyLastUs, 0, "E16: last worker frame, wait + vblank + copy, us");
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_copy_us_max, CTLFLAG_RW | CTLFLAG_LOCKED, &gXeCopyMaxUs, 0, "E16: longest worker frame, us (write 0 to reset)");
++struct NVXeCopy { NVDisplayPipe *pipe; IOService *fb; unsigned head; IOSurface *s, *next; volatile SInt32 busy; struct thread_call *call; };
++static NVXeCopy gXeCopy;
++static IOLock *gXeCopyLock;
++static bool nvXeCopyBusy(const void *pipe)
++{
++    return __atomic_load_n(&gXeCopy.busy, __ATOMIC_ACQUIRE) && gXeCopy.pipe == pipe;
++}
++static void nvXeCopyRun(void *, void *)
++{
++    NVXeCopy *e = &gXeCopy;
++    for (;;) {
++        IOSurface *s = e->s;
++        const uint64_t t0 = mach_absolute_time();
++        if (!e->pipe->xeCopyNow(e->fb, e->head, s)) OSAddAtomic64(1, &gCntXeCopyFail);
++        else OSAddAtomic64(1, &gCntXeCopyDone);
++        gXeCopyLastUs = (int)nvXeUs(t0); if (gXeCopyLastUs > gXeCopyMaxUs) gXeCopyMaxUs = gXeCopyLastUs;
++        ((OSObject *)s)->release();
++        IOLockLock(gXeCopyLock);
++        IOSurface *n = e->next; e->next = nullptr; e->s = n;
++        NVDisplayPipe *pipe = e->pipe;
++        if (!n) __atomic_store_n(&e->busy, 0, __ATOMIC_RELEASE);
++        IOLockUnlock(gXeCopyLock);
++        _ZN18IOAccelDisplayPipe26signalTransactionInterruptEPv(pipe, nullptr);
++        if (!n) { ((OSObject *)pipe)->release(); return; }
++    }
++}
++static bool nvXeCopyQueue(NVDisplayPipe *pipe, IOService *fb, unsigned head, IOSurface *s)
++{
++    NVXeCopy *e = &gXeCopy;
++    if (!gXeCopyLock) { IOLock *l = IOLockAlloc(); if (l && !OSCompareAndSwapPtr(nullptr, l, (void *volatile *)&gXeCopyLock)) IOLockFree(l); }
++    if (!gXeCopyLock) return false;
++    if (!e->call) e->call = thread_call_allocate(nvXeCopyRun, nullptr);   // performTransaction calls are serialized per pipe
++    if (!e->call) return false;
++    ((OSObject *)s)->retain();
++    IOLockLock(gXeCopyLock);
++    if (__atomic_load_n(&e->busy, __ATOMIC_ACQUIRE)) {
++        if (e->pipe != pipe || e->fb != fb) { IOLockUnlock(gXeCopyLock); ((OSObject *)s)->release(); return false; }   // another pipe: copy inline
++        IOSurface *old = e->next; e->next = s;
++        IOLockUnlock(gXeCopyLock);
++        if (old) { OSAddAtomic64(1, &gCntXeCopyDropped); ((OSObject *)old)->release(); }
++        OSAddAtomic64(1, &gCntXeCopyQueued);
++        return true;
++    }
++    ((OSObject *)pipe)->retain();
++    e->pipe = pipe; e->fb = fb; e->head = head; e->s = s; e->next = nullptr;
++    __atomic_store_n(&e->busy, 1, __ATOMIC_RELEASE);
++    IOLockUnlock(gXeCopyLock);
++    OSAddAtomic64(1, &gCntXeCopyQueued);
++    thread_call_enter(e->call);
++    return true;
++}
++// ---- E16: zero-copy flip through XeGfx core's GGTT slots (ArrowWhatever 0008 core + the 0009 idea) ----------------
++// The frame's own system-memory pages are pointed at by a reserved GGTT slot ("xgFlipInit"/"xgFlipMap" in XeGfx core)
++// and PLANE_SURF of the panel's pipe is written once; the plane latches it at the next vblank. No copy. The previous
++// two frames stay referenced until a later flip proves their slot is no longer scanned. Any failure goes back to the
++// copy path, and the plane is pointed back at the firmware framebuffer first (nvXeFlipHome).
++static int gXeFlip = 0, gXeFlipClflush = 1;
++static SInt64 gCntXeFlips, gCntXeFlipMiss, gCntXeFlipFail, gCntXeFlipHome;
++static unsigned long long gXeFlipGgtt[8]; static unsigned gXeFlipSlots, gXeFlipNext, gXeFlipLive = ~0u;
++static unsigned long long gXeFlipBytes; static uint32_t gXeFlipOrigSurf; static int gXeFlipPipe = -1;
++static IOSurface *gXeFlipFront, *gXeFlipPrev;
++static IOService *gXeFlipRes;
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlip, 0, "E16: 1 = scan the composited frame out of its own pages through a GGTT slot (no copy; needs XeGfx core with xgFlipInit)");
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip_clflush, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlipClflush, 0, "E16: 1 = flush the frame from the CPU caches before the plane scans it (default)");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_flips, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeFlips, "E16: frames put on the panel by a zero-copy flip");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_flip_miss, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeFlipMiss, "E16: frames copied because their layout does not match the plane");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_flip_fail, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeFlipFail, "E16: flips that failed (copied instead)");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_flip_home, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeFlipHome, "E16: times the plane was pointed back at the firmware framebuffer");
++static IOReturn nvXeResidentCall(const char *fn, void *p1, void *p2, void *p3, void *p4)
++{
++    if (!gXeFlipRes) { OSDictionary *m = IOService::serviceMatching("XeGfxResident");
++        if (m) { gXeFlipRes = IOService::waitForMatchingService(m, 1000ULL * 1000 * 1000); m->release(); } }
++    if (!gXeFlipRes) return kIOReturnNotAttached;
++    const OSSymbol *sym = OSSymbol::withCStringNoCopy(fn);
++    if (!sym) return kIOReturnNoMemory;
++    IOReturn r = gXeFlipRes->callPlatformFunction(sym, false, p1, p2, p3, p4);
++    sym->release();
++    return r;
++}
++static volatile uint32_t *nvXeRegs(void) { return gXeMmio ? (volatile uint32_t *)gXeMmio->getVirtualAddress() : nullptr; }
++static bool nvXeWaitLatch(volatile uint32_t *r, int p)
++{
++    const uint32_t f0 = r[(0x70040 + p * 0x1000) / 4];
++    const uint64_t t0 = mach_absolute_time();
++    while (nvXeUs(t0) < 25000) { if (r[(0x70040 + p * 0x1000) / 4] != f0) return true; IOSleep(1); }
++    return false;
++}
++// Point the plane back at the firmware framebuffer (copy path from here on), and let go of the flipped frames.
++static void nvXeFlipHome(void)
++{
++    volatile uint32_t *r = nvXeRegs();
++    if (gXeFlipLive != ~0u && r && gXeFlipPipe >= 0 && gXeFlipOrigSurf) {
++        r[(0x7019c + gXeFlipPipe * 0x1000) / 4] = gXeFlipOrigSurf;
++        (void)nvXeWaitLatch(r, gXeFlipPipe);
++        OSAddAtomic64(1, &gCntXeFlipHome);
++    }
++    gXeFlipLive = ~0u;
++    if (gXeFlipPrev) { ((OSObject *)gXeFlipPrev)->release(); gXeFlipPrev = nullptr; }
++    if (gXeFlipFront) { ((OSObject *)gXeFlipFront)->release(); gXeFlipFront = nullptr; }
++}
++static bool nvXeFlipIsLive(void) { return gXeFlipLive != ~0u; }
++static int nvXeFlipOn(void) { return gXeFlip && gXeAsyncCopy; }
++static bool nvXeFlipNow(NVDisplayPipe *pipe, unsigned h, IOSurface *s, unsigned long long P, const volatile unsigned int *src)
++{
++    volatile uint32_t *r = nvXeRegs();
++    const int p = gIopVblPipe;
++    if (!r || p < 0 || p > 3) { OSAddAtomic64(1, &gCntXeFlipMiss); return false; }
++    const uint32_t ctl = r[(0x70180 + p * 0x1000) / 4], stride = (r[(0x70188 + p * 0x1000) / 4] & 0x7ff) * 64u;
++    // the plane must be on, linear (PLANE_CTL tiling 12:10 = 0) and have the frame's row pitch
++    if (!(ctl & 0x80000000u) || (ctl & (7u << 10)) || stride != P) { OSAddAtomic64(1, &gCntXeFlipMiss); return false; }
++    const unsigned long long bytes = P * h;
++    if (!gXeFlipSlots || gXeFlipBytes != bytes) {
++        unsigned n = 0;
++        if (gXeFlipSlots && gXeFlipBytes != bytes) { OSAddAtomic64(1, &gCntXeFlipMiss); return false; }   // slots are fixed size
++        if (nvXeResidentCall("xgFlipInit", (void *)(uintptr_t)bytes, (void *)(uintptr_t)3, gXeFlipGgtt, &n) != kIOReturnSuccess || !n) {
++            OSAddAtomic64(1, &gCntXeFlipFail); gXeFlip = 0;
++            ALOG("iop: E16 zero-copy flip: XeGfx core has no GGTT flip slots (xgFlipInit refused) -- debug.nvaccel_xe_flip=0");
++            return false;
++        }
++        gXeFlipSlots = n; gXeFlipBytes = bytes; gXeFlipNext = 0;
++        ALOG("iop: E16 zero-copy flip: %u GGTT slots x %llu bytes (first 0x%llx), pipe %c", n, bytes, gXeFlipGgtt[0], 'A' + p);
++    }
++    if (gXeFlipLive == ~0u) { gXeFlipOrigSurf = r[(0x7019c + p * 0x1000) / 4] & ~0xfffu; gXeFlipPipe = p; }
++    unsigned slot = gXeFlipNext % gXeFlipSlots;
++    for (unsigned i = 0; i < gXeFlipSlots; i++) { slot = (gXeFlipNext + i) % gXeFlipSlots; if (slot != gXeFlipLive) break; }
++    if (slot == gXeFlipLive) { OSAddAtomic64(1, &gCntXeFlipMiss); return false; }
++    IOMemoryDescriptor *md = s->getMemoryDescriptor();
++    if (!md || md->getLength() < bytes || md->prepare(kIODirectionNone) != kIOReturnSuccess) { OSAddAtomic64(1, &gCntXeFlipFail); return false; }
++    static unsigned long long phys[4224];
++    const unsigned need = (unsigned)((bytes + 4095ull) >> 12);
++    unsigned npages = 0; IOByteCount off = 0;
++    if (need <= 4224) while (off < (IOByteCount)bytes && npages < need) {
++        IOByteCount segLen = 0;
++        addr64_t pa = md->getPhysicalSegment(off, &segLen, kIOMemoryMapperNone);
++        if (!pa || !segLen) break;
++        for (IOByteCount q = 0; q < segLen && npages < need && off + q < (IOByteCount)bytes; q += 4096)
++            phys[npages++] = ((unsigned long long)pa + q) & ~0xfffull;
++        off += segLen;
++    }
++    const IOReturn mr = npages < need ? kIOReturnNoSpace
++        : nvXeResidentCall("xgFlipMap", (void *)(uintptr_t)slot, phys, (void *)(uintptr_t)npages, (void *)(uintptr_t)bytes);
++    md->complete(kIODirectionNone);
++    if (mr != kIOReturnSuccess) { OSAddAtomic64(1, &gCntXeFlipFail); return false; }
++    // the display engine does not snoop the CPU caches: pixels the plugin wrote with the CPU must reach memory first
++    if (gXeFlipClflush && src) nvXeIopClflush(src, (size_t)bytes);
++    r[(0x7019c + p * 0x1000) / 4] = (uint32_t)gXeFlipGgtt[slot];   // the arming write; latches at the next vblank
++    const bool latched = nvXeWaitLatch(r, p);
++    if (gXeFlipPrev) ((OSObject *)gXeFlipPrev)->release();
++    gXeFlipPrev = gXeFlipFront; gXeFlipFront = s; ((OSObject *)s)->retain();
++    gXeFlipLive = slot; gXeFlipNext = slot + 1;
++    OSAddAtomic64(1, latched ? &gCntXeFlips : &gCntXeFlipFail);
++    (void)pipe;
++    return true;
++}
++// ---- E16 K9b: the flip worker's wait for the frame (ArrowWhatever K9 + our per-surface marks) -----------------------
++// With the completion marks on (nvaccel_surface_gpu_on=1) WindowServer no longer waits for its composites; the worker
++// does. The per-surface pending bit alone starves on a busy desktop: WindowServer keeps committing new work into the
++// same surface, so the bit rarely clears and every frame ran into the 100 ms bound (timeouts + glitches, 2026-11-01).
++// Here the frame is ready when its surface mark clears OR the whole GPU is idle (core "xgFlipQuery", the K9 ordering
++// point: idle means every request that wrote this frame is done), polled every 0.5 ms, at most xe_idle_ms.
++static int gXeK9 = 1, gXeIdleMs = 40;
++static SInt64 gCntXeK9Mark, gCntXeK9Idle, gCntXeK9Forced, gCntXeK9Free;
++static int gXeK9MaxUs, gXeK9NoQuery;
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_k9, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeK9, 0, "E16: 1 = the flip worker waits for surface-ready OR GT idle (K9b, default); 0 = surface mark only (100 ms bound)");
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_idle_ms, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeIdleMs, 0, "E16: longest K9b wait for a frame, ms (then it is shown anyway, counted in xe_k9_forced)");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_k9_free, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeK9Free, "E16: K9b frames that were ready at once");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_k9_mark, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeK9Mark, "E16: K9b frames released by their surface mark");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_k9_idle, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeK9Idle, "E16: K9b frames released by GT idle");
++SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_k9_forced, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeK9Forced, "E16: K9b frames shown after xe_idle_ms without either");
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_k9_max_us, CTLFLAG_RW | CTLFLAG_LOCKED, &gXeK9MaxUs, 0, "E16: longest K9b wait, us (write 0 to reset)");
++static bool nvXeSurfPending(unsigned id)
++{
++    IOLock *l = gSurfPendLock;
++    if (!l || !id || !gSurfGpuOn) return false;
++    bool pend = false;
++    IOLockLock(l);
++    for (unsigned i = 0; i < 32; i++) if (gSurfPend[i].id == id) { pend = true; break; }
++    IOLockUnlock(l);
++    return pend;
++}
++static void nvXeWaitFrame(unsigned id)
++{
++    if (!gXeK9 || !gXeFlip || gXeK9NoQuery) { nvSurfWaitReady(id); return; }
++    if (!nvXeSurfPending(id)) { OSAddAtomic64(1, &gCntXeK9Free); return; }
++    const uint64_t t0 = mach_absolute_time();
++    const unsigned budgetUs = (unsigned)((gXeIdleMs > 0 && gXeIdleMs <= 100 ? gXeIdleMs : 40) * 1000);
++    SInt64 *why = &gCntXeK9Forced;
++    for (;;) {
++        if (!nvXeSurfPending(id)) { why = &gCntXeK9Mark; break; }
++        int idle = 0;
++        if (nvXeResidentCall("xgFlipQuery", &idle, nullptr, nullptr, nullptr) != kIOReturnSuccess || idle < 0) {
++            gXeK9NoQuery = 1; ALOG("iop: E16 K9b: core has no xgFlipQuery - surface marks only"); nvSurfWaitReady(id); return; }
++        if (idle == 1) { why = &gCntXeK9Idle; break; }
++        if (nvXeUs(t0) >= budgetUs) break;
++        IODelay(500);
++    }
++    OSAddAtomic64(1, why);
++    const int us = (int)nvXeUs(t0); if (us > gXeK9MaxUs) gXeK9MaxUs = us;
++}
++// The copy branch of performTransaction for one IOSurface, on the worker.
++bool NVDisplayPipe::xeCopyNow(IOService *fb, unsigned head, IOSurface *s)
++{
++    NVAccel *a = NVAccel::gAccel;
++    if (!a || !fb || !s) return false;
++    nvXeWaitFrame(s->getSurfaceID());   // K9b: surface mark OR GT idle, bounded
++    if (!nvAccelSurfCopyReady(s, head)) return true;   // keeps the previous picture, as the inline path does
++    if (s->getPixelFormat() != 0x42475241u) return false;
++    const unsigned long long W = s->getWidth(), H = s->getHeight(), P = s->getBytesPerRow();
++    if (!W || !H || W > 16384 || H > 16384 || P < 4 * W || (P & 3)) return false;
++    IOMemoryDescriptor *md = s->getMemoryDescriptor();
++    if (!md) return false;
++    const volatile unsigned int *src = (const volatile unsigned int *)iopMapSurface(s->getSurfaceID(), md, H * P);
++    if (!src) return false;
++    struct NVRMVramRequest q;
++    for (unsigned i = 0; i < sizeof q; i++) ((volatile unsigned char *)&q)[i] = 0;
++    q.version = NVRM_VRAM_ABI_VERSION;
++    if (a->askFramebufferForScanout(&q, fb) != kIOReturnSuccess || !q.kva || q.pitch < 4 || !q.height) return false;
++    if (W != q.width || H != q.height) return false;
++    if (gXeFlip && head == 4) {
++        if (gIopVblPipe < 0) (void)nvXeWaitVblank(a->fPCI, (unsigned)H);   // finds the panel's pipe
++        if (nvXeFlipNow(this, (unsigned)H, s, P, src)) return true;
++    }
++    if (gXeFlipLive != ~0u) nvXeFlipHome();   // copying again: the plane must scan the firmware framebuffer
++    nvAccelIopHome(fb, head);
++    const unsigned w = (unsigned)W, h = (unsigned)H, pitch = (unsigned)P;
++    const unsigned words = (((pitch < q.pitch) ? pitch : q.pitch) & ~3u) / 4, spr = pitch / 4, dpr = q.pitch / 4;
++    volatile unsigned int *d = (volatile unsigned int *)q.kva;
++    if (gIopVblSync) OSAddAtomic64(1, nvXeWaitVblank(a->fPCI, h) ? &gCntIopVblHit : &gCntIopVblMiss);
++    const uint64_t t0 = mach_absolute_time();
++    if (gIopClflush) nvXeIopClflush(src, (size_t)h * pitch);
++    if (pitch == q.pitch) memcpy((void *)d, (const void *)src, (size_t)h * pitch);
++    else for (unsigned y = 0; y < h; y++)
++        memcpy((void *)(d + (unsigned long)y * dpr), (const void *)(src + (unsigned long)y * spr), (size_t)words * 4);
++    gIopCopyUs = (int)nvXeUs(t0); if (gIopCopyUs > gIopCopyUsMax) gIopCopyUsMax = gIopCopyUs;
++    (void)w;
++    OSAddAtomic64(1, &gCntIopSrcSurf); OSAddAtomic64(1, &gCntIopOk); OSAddAtomic64(1, &gCntIopOkHead[head]);
++    return true;
++}
++#endif
++
+ IOReturn NVAccel::callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4)
+ {
+     if (fn && p1 && fn->isEqualTo(NVACCEL_SS_FN))
+diff --git a/kexts/XeGfxIntelFB/Info.plist b/kexts/XeGfxIntelFB/Info.plist
+index e2a68a6..20502c1 100644
+--- a/kexts/XeGfxIntelFB/Info.plist
++++ b/kexts/XeGfxIntelFB/Info.plist
+@@ -29,7 +29,7 @@
+ 			<key>IONameMatch</key>
+ 			<string>display</string>
+ 			<key>IOPCIMatch</key>
+-			<string>0x7d678086</string>
++			<string>0x7d518086 0x7d678086 0x7d418086 0x7dd18086</string>
+ 			<key>IOProbeScore</key>
+ 			<integer>20001</integer>
+ 			<key>IOProviderClass</key>
+diff --git a/plugin/NVMTLObjects.m b/plugin/NVMTLObjects.m
+index edb5e82..a23f97e 100644
+--- a/plugin/NVMTLObjects.m
++++ b/plugin/NVMTLObjects.m
+@@ -785,6 +785,25 @@ static NVMTLTexture *nvmtl_texbuf_make(NVMTLBuffer *b, MTLTextureDescriptor *d,
+         nvlog("newTiledTextureWithDescriptor: %lux%lu bpr %lu off %lu: no linear view and no CPU copy (buffer %lu B) -> nil",
+               (unsigned long)d.width, (unsigned long)d.height, (unsigned long)bpr, (unsigned long)offset, (unsigned long)_b.size);
+         return nil; }
++    // E16: a mipmapped request (CA's icon and corner-mask images, 144x144 with 8 levels) got a single-level stand-in,
++    // and anything drawn smaller than its size sampled levels that do not exist: garbled icons, black window corners.
++    // Give it a real texture with every level, level 0 from the caller's bytes and the rest generated on the GPU.
++    if (d.mipmapLevelCount > 1 && !(d.usage & (MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget)) && !getenv("NVMTL_TILED_MIPVIEW")) {
++        MTLTextureDescriptor *md = [d copy]; md.storageMode = MTLStorageModeShared;
++        id<MTLTexture> m = [[self device] newTextureWithDescriptor:md];
++        if (m) {
++            [m replaceRegion:MTLRegionMake2D(0, 0, d.width, d.height) mipmapLevel:0 withBytes:(char *)base + offset bytesPerRow:bpr];
++            static id<MTLCommandQueue> mq; static dispatch_once_t once;
++            dispatch_once(&once, ^{ mq = [[self device] newCommandQueue]; });
++            id<MTLCommandBuffer> cb = [mq commandBuffer];
++            id<MTLBlitCommandEncoder> be = [cb blitCommandEncoder];
++            if (be) { [be generateMipmapsForTexture:m]; [be endEncoding]; }
++            [cb commit]; [cb waitUntilCompleted];
++            { static int said; if (said++ < 4) nvlog("newTiledTextureWithDescriptor: E16 mip path: %lux%lu fmt %lu, %lu levels built and generated",
++                  (unsigned long)d.width, (unsigned long)d.height, (unsigned long)d.pixelFormat, (unsigned long)d.mipmapLevelCount); }
++            return m;
++        }
++    }
+     // A one-time copy goes stale when the caller rewrites the bytes in place (the cursor's clear square on Intel, I-119),
+     // so read-only views get a buffer of our own that is refilled from the caller's bytes at every submission.
+     const NSUInteger ru = d.usage & (MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget);
+diff --git a/plugin/nvmtl_vk.c b/plugin/nvmtl_vk.c
+index 8a7accc..4a6ca81 100644
+--- a/plugin/nvmtl_vk.c
++++ b/plugin/nvmtl_vk.c
+@@ -684,6 +684,86 @@ static void nvmtl_vkmsg_arm(void)
+     }
+ }
+ 
++/* E16: zep245/IrisXe b214 (speed) - a VkPipelineCache kept on disk per process. Mesa's own shader disk cache stays
++   off in WindowServer (it runs as uid 0 / euid 88 and Mesa turns its cache off when they differ), so after every boot
++   WindowServer compiled all of its pipelines again. Loaded when the device comes up, written back a few seconds after
++   new pipelines were made and at exit: <DARWIN_USER_CACHE_DIR>/nvmtl-pcache/<process>.bin. The driver checks the
++   header itself (device, driver UUID). Off: touch /Library/GPUBundles/nvmtl-nopcache. */
++static VkPipelineCache g_pcache = VK_NULL_HANDLE;
++static PFN_vkGetPipelineCacheData pvkGetPipelineCacheDataX;
++static char g_pcache_path[PATH_MAX];
++static volatile int g_pcache_new, g_pcache_saving;
++static size_t g_pcache_loaded;
++static void nvmtl_pcache_save(const char *why)
++{
++    if (!g_pcache || !pvkGetPipelineCacheDataX || !g_pcache_path[0]) return;
++    size_t n = 0;
++    if (pvkGetPipelineCacheDataX(g_dev, g_pcache, &n, NULL) != VK_SUCCESS || !n || n > (128u << 20)) return;
++    void *buf = malloc(n);
++    if (!buf) return;
++    if (pvkGetPipelineCacheDataX(g_dev, g_pcache, &n, buf) == VK_SUCCESS) {
++        char tmp[PATH_MAX + 16]; snprintf(tmp, sizeof tmp, "%s.%d", g_pcache_path, (int)getpid());
++        FILE *f = fopen(tmp, "wb");
++        if (f) {
++            const int ok = fwrite(buf, 1, n, f) == n;
++            fclose(f);
++            if (ok && rename(tmp, g_pcache_path) == 0) { static int said; if (said++ < 3) nvlog("pcache: %zu B written (%s)", n, why); }
++            else unlink(tmp);
++        }
++    }
++    free(buf);
++}
++static void *nvmtl_pcache_saver(void *arg)
++{
++    (void)arg;
++    sleep(5);
++    __atomic_store_n(&g_pcache_new, 0, __ATOMIC_RELAXED);
++    nvmtl_pcache_save("new pipelines");
++    __atomic_store_n(&g_pcache_saving, 0, __ATOMIC_RELEASE);
++    return NULL;
++}
++static void nvmtl_pcache_note_new(void)
++{
++    if (!g_pcache) return;
++    __atomic_fetch_add(&g_pcache_new, 1, __ATOMIC_RELAXED);
++    if (__atomic_exchange_n(&g_pcache_saving, 1, __ATOMIC_ACQ_REL)) return;
++    pthread_t t; pthread_attr_t a; pthread_attr_init(&a); pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
++    if (pthread_create(&t, &a, nvmtl_pcache_saver, NULL)) __atomic_store_n(&g_pcache_saving, 0, __ATOMIC_RELEASE);
++    pthread_attr_destroy(&a);
++}
++static void nvmtl_pcache_atexit(void) { if (__atomic_load_n(&g_pcache_new, __ATOMIC_RELAXED)) nvmtl_pcache_save("exit"); }
++static void nvmtl_pcache_init(void)
++{
++    if (access("/Library/GPUBundles/nvmtl-nopcache", F_OK) == 0) { nvlog("pcache: off (nvmtl-nopcache)"); return; }
++    PFN_vkCreatePipelineCache cpc = (PFN_vkCreatePipelineCache)pvkGetDeviceProcAddr(g_dev, "vkCreatePipelineCache");
++    pvkGetPipelineCacheDataX = (PFN_vkGetPipelineCacheData)pvkGetDeviceProcAddr(g_dev, "vkGetPipelineCacheData");
++    if (!cpc || !pvkGetPipelineCacheDataX) return;
++    char ucd[PATH_MAX]; const size_t un = confstr(_CS_DARWIN_USER_CACHE_DIR, ucd, sizeof ucd);
++    const char *me = getprogname();
++    if (un > 0 && un <= sizeof ucd && me && *me) {
++        char dir[PATH_MAX]; snprintf(dir, sizeof dir, "%snvmtl-pcache", ucd); mkdir(dir, 0700);
++        if (access(dir, W_OK) == 0) snprintf(g_pcache_path, sizeof g_pcache_path, "%s/%s.bin", dir, me);
++    }
++    void *data = NULL; size_t n = 0;
++    if (g_pcache_path[0]) {
++        FILE *f = fopen(g_pcache_path, "rb");
++        if (f) {
++            if (fseek(f, 0, SEEK_END) == 0) { long l = ftell(f); if (l > 0 && l < (128L << 20)) n = (size_t)l; }
++            rewind(f);
++            if (n && (data = malloc(n)) != NULL && fread(data, 1, n, f) != n) { free(data); data = NULL; n = 0; }
++            fclose(f);
++        }
++    }
++    VkPipelineCacheCreateInfo ci = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, NULL, 0, data ? n : 0, data };
++    VkResult r = cpc(g_dev, &ci, NULL, &g_pcache);
++    if (r != VK_SUCCESS && data) { ci.initialDataSize = 0; ci.pInitialData = NULL; r = cpc(g_dev, &ci, NULL, &g_pcache); n = 0; }
++    free(data);
++    if (r != VK_SUCCESS) { g_pcache = VK_NULL_HANDLE; return; }
++    g_pcache_loaded = data ? n : 0;
++    if (g_pcache_path[0]) atexit(nvmtl_pcache_atexit);
++    nvlog("pcache: %s - %zu B loaded from %s", me ? me : "?", g_pcache_loaded, g_pcache_path[0] ? g_pcache_path : "(nowhere: not saved)");
++}
++
+ static int nvmtl_vk_initialize(void)
+ {
+     if (g_state) return g_state == 1 ? 0 : -1;
+@@ -1068,6 +1148,7 @@ static int nvmtl_vk_initialize(void)
+             g_dsr_depth_modes, g_dsr_stencil_modes, g_dsr_indep, g_dsr_indep_none); }
+     nvlog("vk: apps-dyn dynamic vertex strides (vkCmdBindVertexBuffers2): %s", pvkCmdBindVertexBuffers2 ? "yes" : "NO — MTLBufferLayoutStrideDynamic pipelines are refused");
+     pvkGetDeviceQueue(g_dev, g_qfam, 0, &g_queue);
++    nvmtl_pcache_init();   /* E16: zep245 b214 */
+ 
+     g_state = 1;
+     nvlog("vk: UP in this Metal process — \"%s\" api %u.%u.%u, queue family %u", g_name,
+@@ -2035,9 +2116,35 @@ int nvmtl_vk_surface_dirty(uint32_t surfaceID, uint32_t plane) { return nvmtl_vk
+    that publishes NVAccelSurfaceWait is asked): 0 marked, 1 the lock was taken, -1 refused */
+ int nvmtl_vk_surface_dirty_try(uint32_t surfaceID, uint32_t plane) { return nvmtl_vk_surface_mark_newest(surfaceID, plane, 0x40000000u); }
+ // WindowServer completion mark (NVAccel nvSurfGpuEscape), on NVK's surface escape: 0 = the kernel took it
++/* E16: Intel has no NVK surface escape. The same mark goes to XeGfxAccel's 'XGDR' user client, selector 1 (surface,
++   pending) -> NVRM status. An accelerator without selector 1 answers kIOReturnBadArgument: OFF, WindowServer keeps
++   waiting for its own composites as before. NVMTL_XE_WS_WAIT=1 (environment or nvrm610.conf) forces that old way. */
++static uint32_t nvmtl_xe_gpu_mark(uint32_t surfaceID, int pending)
++{
++    static io_connect_t conn; static int state = -1;   /* -1 not tried, 0 unavailable, 1 open */
++    if (state < 0) {
++        const char *e = getenv("NVMTL_XE_WS_WAIT");
++        state = 0;
++        if (!(e && *e == '1')) {
++            io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("NMXAccel"));
++            if (svc) { if (IOServiceOpen(svc, mach_task_self(), 0x58474452u, &conn) == KERN_SUCCESS) state = 1; IOObjectRelease(svc); }
++        }
++        nvlog("WindowServer completion marks over XGDR: %s", state == 1 ? "client open" : (e && *e == '1') ? "off (NVMTL_XE_WS_WAIT=1)" : "no NMXAccel client");
++    }
++    if (state != 1) return 0x80000002u;
++    uint64_t in[2] = { surfaceID, pending ? 1u : 0u }, out = 0x80000002u; uint32_t n = 1;
++    kern_return_t kr = IOConnectCallScalarMethod(conn, 1, in, 2, &out, &n);
++    if (kr != KERN_SUCCESS) {
++        static int said; if (said++ < 2) nvlog("XGDR selector 1 refused (0x%x): this XeGfxAccel has no completion marks - WindowServer waits itself", kr);
++        if (kr == kIOReturnBadArgument || kr == kIOReturnUnsupported) state = 0;
++        return 0x80000002u;
++    }
++    return (uint32_t)out;
++}
+ uint32_t nvmtl_vk_surface_gpu_mark(uint32_t surfaceID, int pending)
+ {
+-    if (!pnvk_surface_dirty || !g_dev) return 0x80000002u;
++    if (!g_dev) return 0x80000002u;
++    if (!pnvk_surface_dirty) return nvmtl_xe_gpu_mark(surfaceID, pending);
+     return pnvk_surface_dirty(g_dev, surfaceID, 0x80000000u | (pending ? 1u : 0u));
+ }
+ /* 1 when NVAccel publishes NVAccelSurfaceWait: its page-off waits for a surface WindowServer's GPU is still writing */
+@@ -4414,7 +4521,8 @@ static int nvmtl_vk_pipeline_create_impl_lifetime_body(const void *vs, size_t vn
+         VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE, { 0 }, { 0 }, 0.0f, 1.0f };
+     VkGraphicsPipelineCreateInfo gp = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, NULL, 0, nstages, stages,
+         &vi, &ia, td ? &tss : NULL, &vps, &rs, &ms, hasDepth ? &ds : NULL, &cb, &dsci, out->layout, out->rp, 0, VK_NULL_HANDLE, -1 };
+-    NVMTL_PIPELINE_STAGE(nvmtl_opaque_CreateGraphicsPipelines(g_dev, VK_NULL_HANDLE, 1, &gp, NULL, &out->pipe), "vkCreateGraphicsPipelines");
++    NVMTL_PIPELINE_STAGE(nvmtl_opaque_CreateGraphicsPipelines(g_dev, g_pcache, 1, &gp, NULL, &out->pipe), "vkCreateGraphicsPipelines");
++    nvmtl_pcache_note_new();
+     if (tcm) pvkDestroyShaderModule(g_dev, tcm, NULL);
+     if (tvm) pvkDestroyShaderModule(g_dev, tvm, NULL);
+     pvkDestroyShaderModule(g_dev, fmod, NULL);
+@@ -4528,7 +4636,8 @@ static int nvmtl_vk_compute_pipeline_create_g_lifetime_body(const void *cs, size
+     VkComputePipelineCreateInfo cpi = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, NULL, 0,
+         { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, NULL, 0, VK_SHADER_STAGE_COMPUTE_BIT, mod, "main", NULL },
+         out->layout, VK_NULL_HANDLE, -1 };
+-    VKCK(nvmtl_opaque_CreateComputePipelines(g_dev, VK_NULL_HANDLE, 1, &cpi, NULL, &out->pipe), "vkCreateComputePipelines");
++    VKCK(nvmtl_opaque_CreateComputePipelines(g_dev, g_pcache, 1, &cpi, NULL, &out->pipe), "vkCreateComputePipelines");
++    nvmtl_pcache_note_new();
+     out->mod = mod;
+     return 0;
+ }
+diff --git a/shim/include/xg_i915.h b/shim/include/xg_i915.h
+index 9576a59..cc52042 100644
+--- a/shim/include/xg_i915.h
++++ b/shim/include/xg_i915.h
+@@ -50,6 +50,15 @@ void xg_i915_map_init(void);
+ int xg_i915_store(struct xg_i915_store *sd, int timeout_ms);
+ /* keep i915 off the GGTT range the boot surface scans out of (Hybrid, display disabled); 0 or a negative errno */
+ int xg_i915_reserve_bootfb(unsigned long long offset, unsigned long long size);
++/* 1 when every uabi engine is idle, 0 busy, -ENODEV without an i915 device; does not sleep */
++int xg_i915_idle(void);
++#define XG_FLIP_MAX_SLOTS	8
++/* zero-copy scanout: reserve GGTT slots, then point one slot's PTEs at a frame's physical pages; 0 or -errno */
++int xg_flip_init(unsigned long long surface_bytes, unsigned int slots, unsigned long long *ggtt_out,
++    unsigned int *count_out);
++int xg_flip_map(unsigned int slot, unsigned long long surface_bytes, const unsigned long long *phys,
++    unsigned int npages);
++int xg_flip_unmap(unsigned int slot, unsigned long long surface_bytes);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/shim/src/xnu/xg_kext.cpp b/shim/src/xnu/xg_kext.cpp
+index c459699..2b3c580 100644
+--- a/shim/src/xnu/xg_kext.cpp
++++ b/shim/src/xnu/xg_kext.cpp
+@@ -154,6 +154,29 @@ XeGfxResident::callPlatformFunction(const OSSymbol *name, bool wait, void *p1, v
+ 		*(int *)p4 = xg_fd_remote_ioctl((int)(uintptr_t)p1, (unsigned long)p2, (unsigned long long)(uintptr_t)p3);
+ 		return kIOReturnSuccess;
+ 	}
++	/* "xgFlipInit" (surface bytes, slots wanted, u64 *ggtt out, unsigned *count out) / "xgFlipMap" (slot,
++	 * phys page array, npages, surface bytes) / "xgFlipUnmap" (slot, surface bytes): zero-copy scanout.  The
++	 * accelerator writes PLANE_SURF itself; this side owns the GGTT slots and the PTEs. */
++	if (name && name->isEqualTo("xgFlipInit") && p3 && p4) {
++		int err = xg_flip_init((unsigned long long)(uintptr_t)p1, (unsigned int)(uintptr_t)p2,
++		    (unsigned long long *)p3, (unsigned int *)p4);
++		return (err == 0 ? kIOReturnSuccess : kIOReturnError);
++	}
++	if (name && name->isEqualTo("xgFlipMap") && p2) {
++		int err = xg_flip_map((unsigned int)(uintptr_t)p1, (unsigned long long)(uintptr_t)p4,
++		    (const unsigned long long *)p2, (unsigned int)(uintptr_t)p3);
++		return (err == 0 ? kIOReturnSuccess : kIOReturnError);
++	}
++	if (name && name->isEqualTo("xgFlipUnmap")) {
++		int err = xg_flip_unmap((unsigned int)(uintptr_t)p1, (unsigned long long)(uintptr_t)p2);
++		return (err == 0 ? kIOReturnSuccess : kIOReturnError);
++	}
++	/* "xgFlipQuery" (int *idle out): 1 when the GPU finished everything it was given (0 busy, -ENODEV only when
++	 * no i915 device is bound); the accelerator's deferred flip worker polls this before it arms a frame. */
++	if (name && name->isEqualTo("xgFlipQuery") && p1) {
++		*(int *)p1 = xg_i915_idle();
++		return kIOReturnSuccess;
++	}
+ 	/* "xgTrace" (const char *line): XeGfxAccel's state, stored with the console trace (thread context only) */
+ 	if (name && name->isEqualTo("xgTrace") && p1 && gLogLock) {
+ 		IOInterruptState is = IOSimpleLockLockDisableInterrupt(gLogLock);
+@@ -549,8 +572,7 @@ xegfx_stage_sysctl(struct sysctl_oid *, void *, int, struct sysctl_req *req)
+ 		gResult[s] = rc;
+ 		if (gResident)
+ 			gResident->setProperty("XeGfxStage", (unsigned long long)s, 32);
+-		if (rc < 0)
+-			break;
++		/* E16 (HONOR binary patch 0x243e5e): a failing stage is recorded in gResult and the next one still runs */
+ 		gStage = s;
+ 	}
+ 	IOLockUnlock(gStageLock);
+diff --git a/tools/kexport.py b/tools/kexport.py
+index 2691b1a..1b1cfe3 100755
+--- a/tools/kexport.py
++++ b/tools/kexport.py
+@@ -4,6 +4,6 @@
+ import os, sys
+ sys.path.insert(0, os.path.expanduser("~/src/kcabi"))
+ import kcfile, linkcheck
+-e = linkcheck.exported(kcfile.KC("/System/Library/KernelCollections/BootKernelExtensions.kc"))
++e = linkcheck.exported(kcfile.KC(os.environ.get("KCABI_KC") or "/System/Library/KernelCollections/BootKernelExtensions.kc"))
+ for s in sys.argv[1:]:
+     print(f"{s:44s} {e.get('_' + s, '-')}")
+diff --git a/tools/kpi_split.py b/tools/kpi_split.py
+index 67a8a34..94603cc 100644
+--- a/tools/kpi_split.py
++++ b/tools/kpi_split.py
+@@ -5,7 +5,7 @@ import os, sys
+ sys.path.insert(0, os.path.expanduser("~/src/kcabi"))
+ import kcfile, linkcheck
+ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+-kc = kcfile.KC("/System/Library/KernelCollections/BootKernelExtensions.kc")
++kc = kcfile.KC(os.environ.get("KCABI_KC") or "/System/Library/KernelCollections/BootKernelExtensions.kc")
+ exp = linkcheck.exported(kc)
+ # XNU exports some names FreeBSD also uses with another ABI (eventhandler_*, selrecord, ...): a name binds to XNU
+ # only when tools/xnu-allow.txt lists it as checked
+diff --git a/tools/link.sh b/tools/link.sh
+index e4eaaa4..a060747 100755
+--- a/tools/link.sh
++++ b/tools/link.sh
+@@ -41,12 +41,13 @@ if [ -f "$FW/mtl_guc_70.bin" ]; then
+ fi
+ codesign -s - -f "$ROOT/out/XeGfx.kext" >/dev/null 2>&1 || true
+ echo "XeGfx.kext $(stat -f %z "$B/MacOS/XeGfx") B"
+-python3 ~/src/kcabi/linkcheck.py "$ROOT/out/XeGfx.kext" | tail -25
++python3 ~/src/kcabi/linkcheck.py "$ROOT/out/XeGfx.kext" ${KCABI_KC:+--kc "$KCABI_KC"} | tail -25
+ # every undefined symbol must resolve from a declared, public KPI library (kmutil enforces this when it builds a
+ # collection; linkcheck only knows what the kernel exports)
+-python3 "$ROOT/tools/kpi_check.py" "$ROOT/out/XeGfx.kext" || exit 1
++# E16 cross: kmutil on an arm64 host cannot resolve x86_64 KPIs
++if [ "$(uname -m)" = x86_64 ]; then python3 "$ROOT/tools/kpi_check.py" "$ROOT/out/XeGfx.kext" || exit 1; else echo "kpi check skipped on $(uname -m) (kmutil on the laptop checks it)"; fi
+ # a kernel name defined inside the kext would capture the XNU-side callers (I-094)
+-python3 "$ROOT/tools/shadow_check.py" "$ROOT/out/XeGfx.kext" || exit 1
++python3 "$ROOT/tools/shadow_check.py" "$ROOT/out/XeGfx.kext" ${KCABI_KC:+--kc "$KCABI_KC"} || exit 1
+ # and against every other macOS build's collection we have (~/abi-src/<build>/kc, see kcabi)
+ for kc in "$HOME"/abi-src/*/kc/BootKernelExtensions.kc; do
+   [ -f "$kc" ] || continue
+diff --git a/translator/translator/src/native/emitter/types.rs b/translator/translator/src/native/emitter/types.rs
+index a0ac00b..00da797 100644
+--- a/translator/translator/src/native/emitter/types.rs
++++ b/translator/translator/src/native/emitter/types.rs
+@@ -541,6 +541,9 @@ impl Emitter {
+             },
+             LlValue::Float32Bits(bits) => match self.resolve_type(ty)? {
+                 LlType::Float => self.const_float32_bits(*bits),
++                /* AIR carries an f32 bit pattern for a half constant when Core Animation specializes
++                 * fixed_frag_lph_cph (spec "Xh"): narrow it to half instead of refusing the module (HONOR A-41). */
++                LlType::Half => self.const_float16_bits(f32_to_f16_bits(f32::from_bits(*bits))),
+                 other => Err(format!(
+                     "native emitter: float32 bit literal f0x{bits:08x} used as non-float type {other:?}"
+                 )),
+diff --git a/xkpi/src/i915/xg_i915_exec.c b/xkpi/src/i915/xg_i915_exec.c
+index 916fcfc..4d65cac 100644
+--- a/xkpi/src/i915/xg_i915_exec.c
++++ b/xkpi/src/i915/xg_i915_exec.c
+@@ -35,6 +35,14 @@ xg_i915_find(struct pci_dev **pdevp)
+ 	return (NULL);
+ }
+ 
++struct drm_i915_private *
++xg_i915_dev(void)
++{
++	struct pci_dev *pdev = NULL;
++
++	return (xg_i915_find(&pdev));
++}
++
+ int
+ xg_i915_state(struct xg_i915_state *st)
+ {
+@@ -65,7 +73,7 @@ xg_i915_state(struct xg_i915_state *st)
+ 		st->engines++;
+ 	if (i915->drm.render != NULL)
+ 		st->render_minor = i915->drm.render->index;
+-	pci_dev_put(pdev);
++	/* E16 (HONOR binary patch): no pci_dev_put - xg_i915_find took no reference */
+ 	return (0);
+ }
+ 
+@@ -90,7 +98,7 @@ xg_i915_gtawake(int level)
+ 			intel_uncore_forcewake_user_get(gt->uncore);
+ 		n++;
+ 	}
+-	pci_dev_put(pdev);
++	/* E16 (HONOR binary patch): no pci_dev_put - xg_i915_find took no reference */
+ 	printf("xegfx: gtawake %d held on %d GTs\n", level, n);
+ 	return (n);
+ }
+@@ -130,7 +138,7 @@ xg_i915_exec(struct xg_i915_exec *ex, int timeout_ms)
+ 		else
+ 			ex->done++;
+ 	}
+-	pci_dev_put(pdev);
++	/* E16 (HONOR binary patch): no pci_dev_put - xg_i915_find took no reference */
+ 	return (0);
+ }
+ 
+@@ -190,7 +198,7 @@ xg_i915_store(struct xg_i915_store *sd, int timeout_ms)
+ 		else
+ 			sd->ok++;
+ 	}
+-	pci_dev_put(pdev);
++	/* E16 (HONOR binary patch): no pci_dev_put - xg_i915_find took no reference */
+ 	return (0);
+ }
+ 
+@@ -220,3 +228,29 @@ xg_i915_reserve_bootfb(unsigned long long offset, unsigned long long size)
+ 	mutex_unlock(&ggtt->vm.mutex);
+ 	return (err);
+ }
++
++/*
++ * Idle probe for the deferred display flip (K9): has everything the GPU was asked to do finished?  The
++ * accelerator's flip worker calls this through "xgFlipQuery" every millisecond before it points the plane at
++ * a frame, so a frame is only scanned out once the requests that wrote it are complete.  Thread context only,
++ * does not sleep: intel_engine_is_idle just looks at the request queues and the engine's PM state.
++ */
++int
++xg_i915_idle(void)
++{
++	struct pci_dev *pdev = NULL;
++	struct drm_i915_private *i915 = xg_i915_find(&pdev);
++	struct intel_gt *gt;
++	struct intel_engine_cs *engine;
++	int id;
++
++	if (!i915)
++		return (-ENODEV);
++	gt = to_gt(i915);
++	for (id = 0; id < I915_NUM_ENGINES; id++) {
++		engine = gt->engine[id];
++		if (engine && !intel_engine_is_idle(engine))
++			return (0);
++	}
++	return (1);
++}
+diff --git a/xkpi/src/i915/xg_i915_flip.c b/xkpi/src/i915/xg_i915_flip.c
+new file mode 100644
+index 0000000..7515edb
+--- /dev/null
++++ b/xkpi/src/i915/xg_i915_flip.c
+@@ -0,0 +1,125 @@
++// SPDX-License-Identifier: MIT
++/*
++ * Zero-copy scanout: reserved GGTT slots whose PTEs point at the compositor's own frame pages.  The accelerator
++ * (XeGfxAccel) writes PLANE_SURF_1_A itself; this file only owns the GGTT side - reserve, PTE writes, invalidate.
++ * A frame that the display scans out of its own memory is not copied at all, so this is the end of the CPU
++ * copy path. <wtl> project: xegfx | author: watchthelight </wtl>
++ */
++#include <linux/pci.h>
++#include <linux/string.h>
++#include <linux/io.h>
++
++#include "i915_drv.h"
++#include "gt/intel_gt.h"
++#include "gt/intel_gtt.h"
++#include "i915_gem_gtt.h"
++#include "gem/i915_gem_object.h"
++
++#include "xg_i915.h"
++
++extern struct drm_i915_private *xg_i915_dev(void);
++
++static struct drm_mm_node gXgFlipNode[XG_FLIP_MAX_SLOTS];
++static unsigned int gXgFlipSlots;
++static unsigned long long gXgFlipBytes;
++
++static struct i915_ggtt *
++xg_flip_ggtt(struct drm_i915_private **i915p)
++{
++	struct drm_i915_private *i915 = xg_i915_dev();
++
++	if (i915 == NULL)
++		return (NULL);
++	*i915p = i915;
++	return (to_gt(i915)->ggtt);
++}
++
++/* reserve `slots` GGTT slots of `surface_bytes` each, below 4 GiB (PLANE_SURF is 32-bit); 0 or -errno */
++int
++xg_flip_init(unsigned long long surface_bytes, unsigned int slots, unsigned long long *ggtt_out,
++    unsigned int *count_out)
++{
++	struct i915_ggtt *ggtt;
++	struct drm_i915_private *i915;
++	unsigned long long size;
++	unsigned int i, done = 0;
++	int err = 0;
++
++	if (ggtt_out == NULL || count_out == NULL || surface_bytes == 0)
++		return (-EINVAL);
++	if ((ggtt = xg_flip_ggtt(&i915)) == NULL)
++		return (-ENODEV);
++	size = round_up(surface_bytes, I915_GTT_PAGE_SIZE);
++	if (gXgFlipSlots != 0 && gXgFlipBytes >= size) {	/* already reserved, large enough */
++		for (i = 0; i < gXgFlipSlots; i++)
++			ggtt_out[i] = gXgFlipNode[i].start;
++		*count_out = gXgFlipSlots;
++		return (0);
++	}
++	if (slots > XG_FLIP_MAX_SLOTS)
++		slots = XG_FLIP_MAX_SLOTS;
++	mutex_lock(&ggtt->vm.mutex);
++	for (i = 0; i < slots; i++) {
++		err = i915_gem_gtt_insert(&ggtt->vm, NULL, &gXgFlipNode[i], size, I915_GTT_PAGE_SIZE,
++		    I915_COLOR_UNEVICTABLE, 0x80000000ULL, 0x100000000ULL, PIN_NOEVICT);
++		if (err)
++			break;
++		ggtt_out[i] = gXgFlipNode[i].start;
++		done++;
++	}
++	mutex_unlock(&ggtt->vm.mutex);
++	if (done == 0)
++		return (err != 0 ? err : -ENOSPC);
++	gXgFlipSlots = done;
++	gXgFlipBytes = size;
++	*count_out = done;
++	return (0);
++}
++
++/* point slot's PTEs at these physical pages (4 KiB each), then one TLB invalidate for the whole slot */
++int
++xg_flip_map(unsigned int slot, unsigned long long surface_bytes, const unsigned long long *phys,
++    unsigned int npages)
++{
++	struct i915_ggtt *ggtt;
++	struct drm_i915_private *i915;
++	unsigned long long size;
++	unsigned int i, need;
++	unsigned int pat;
++
++	if (slot >= gXgFlipSlots || phys == NULL || surface_bytes == 0)
++		return (-EINVAL);
++	if ((ggtt = xg_flip_ggtt(&i915)) == NULL)
++		return (-ENODEV);
++	size = round_up(surface_bytes, I915_GTT_PAGE_SIZE);
++	need = (unsigned int)(size >> 12);
++	if (npages < need)
++		return (-EINVAL);
++	/* system-memory scanout: uncached, which on this platform encodes as a plain phys|PRESENT PTE */
++	pat = i915_gem_get_pat_index(i915, I915_CACHE_NONE);
++	for (i = 0; i < need; i++) {
++		u64 pte = ggtt->vm.pte_encode((dma_addr_t)(phys[i] & ~0xfffull), pat, 0);
++		writeq(pte, (u64 __iomem *)ggtt->gsm + (gXgFlipNode[slot].start >> 12) + i);
++	}
++	ggtt->invalidate(ggtt);
++	return (0);
++}
++
++/* drop the slot's PTEs back to scratch, then one TLB invalidate (clear_range is a no-op on gen8+) */
++int
++xg_flip_unmap(unsigned int slot, unsigned long long surface_bytes)
++{
++	struct i915_ggtt *ggtt;
++	struct drm_i915_private *i915;
++	unsigned long long size;
++
++	if (slot >= gXgFlipSlots || surface_bytes == 0)
++		return (-EINVAL);
++	if ((ggtt = xg_flip_ggtt(&i915)) == NULL)
++		return (-ENODEV);
++	size = round_up(surface_bytes, I915_GTT_PAGE_SIZE);
++	if (ggtt->vm.scratch_range != NULL)
++		ggtt->vm.scratch_range(&ggtt->vm, gXgFlipNode[slot].start, size);
++	ggtt->invalidate(ggtt);
++	return (0);
++}
