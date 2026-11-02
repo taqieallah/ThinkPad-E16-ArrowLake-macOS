@@ -27,7 +27,7 @@ OpenCore boot-args on the stick (works from the Mac too, for recovery).
 | Desktop (`arc-mode.sh desktop`) | ArcFB takes the panel, cursor visible, **everything else black** |
 
 The upload hang is upstream's too: ArcMTL `5413b62` (format widening) and `e04b0fa` (route MTL uploads through
-compute) target exactly this test. The scripts are pinned to `e04b0fa`; that build was not tested on the E16 yet.
+compute) target exactly this test. The scripts are pinned to `327db35` (2026-11-02 22:14 +07: cache/PAT/TLB/RCS-ordering fixes on top of `e04b0fa`); not tested on the E16 yet. Our three ArcXe patches still apply (nested-batch is not fixed upstream).
 
 ## Building it (Mac)
 

@@ -3,7 +3,7 @@
 #   bash ~/Desktop/xe-update/arc/build-arc.sh
 # ArcXe stays OFF on a normal boot (our XeGfx stack untouched); it attaches only when OpenCore passes arcxe=1.
 set -euo pipefail
-HERE=$(cd "$(dirname "$0")" && pwd); SRC=$HOME/src/ArcMTL; PIN=e04b0fa7385244656d85cea26762904632465c89
+HERE=$(cd "$(dirname "$0")" && pwd); SRC=$HOME/src/ArcMTL; PIN=327db354abe8c6d02313974ef3bafa3a36b84ce7
 L=$HERE/build-arc.log; : > "$L"; log() { echo "$*"; echo "$*" >> "$L"; }
 [ -d "$SRC/.git" ] || git clone https://github.com/longurara/ArcMTL "$SRC" >> "$L" 2>&1
 ( cd "$SRC" && git fetch -q origin && git checkout -q -f "$PIN" ) >> "$L" 2>&1 || { log "STOP: could not check out ArcMTL $PIN"; exit 1; }

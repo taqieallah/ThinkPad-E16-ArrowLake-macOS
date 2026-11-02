@@ -8,7 +8,7 @@ NMPIN=470e391e8cf8d7e499cdabfa7f2daadb6e14bcfd
 L=$HERE/build-arc-full.log; : > "$L"; log() { echo "$*"; echo "$*" >> "$L"; }
 [ -f "$SRC/out/arcmtl/libvulkan_intel.dylib" ] || { echo "run build-arc-anv.sh first"; exit 1; }
 export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
-( cd "$SRC" && git fetch -q origin && git checkout -q -f e04b0fa7385244656d85cea26762904632465c89 ) >> "$L" 2>&1
+( cd "$SRC" && git fetch -q origin && git checkout -q -f 327db354abe8c6d02313974ef3bafa3a36b84ce7 ) >> "$L" 2>&1
 python3 "$HERE/patch-arcxe-e16.py" "$SRC" | tee -a "$L" || { echo "STOP: E16 patches did not apply"; exit 1; }
 log ">>> ArcMTL $(cd "$SRC" && git log -1 --format='%h %ad %s' --date=short)"
 log ">>> Mesa ANV with this ArcMTL's patches (incremental)"
