@@ -26,15 +26,17 @@ macOS showed no refresh-rate choice. That is expected: IOGraphics hides the choi
 Measured smoothness after flip + K9b: **less than 10 % better** than before. So the remaining cost is not on the
 display side.
 
-## What is probably left
+## Measured on 2026-11-02 (macOS 26.7.1)
 
-ArrowWhatever measured WindowServer composing only 12–19 frames/s on this stack regardless of the display path.
-The plugin is NullMoth's NVIDIA design: surfaces are copied in and out of "VRAM", which on a UMA iGPU is the same
-memory. The WTL plugin already imports IOSurface pages directly on Intel/AMD (`_hostImg`), so this is a hypothesis,
-not a finding. The next step is a profile:
-```
-sudo sample WindowServer 10 -file /Volumes/1401/xegfx-e16/logs/ws-sample.txt   # while moving windows
-```
+- `sample WindowServer`: main thread 87 % idle, composite ≈ 1.5 ms, no GPU wait on the main thread → not the bottleneck.
+- `fps-check.sh bench` (scripts/bench/ca_bench.m, a fixed Core Animation sweep): **43–53 fps** with flip + K9b + hold=1,
+  0 lost frames.
+- `flip_hold=0` (newest wins): ~35 fps with dropped frames. `flip_hold=2` (one in flight + one queued): ~55 fps, peaks
+  62–63, but visible stutter/tearing because WindowServer reuses a buffer that is still being scanned once the
+  transaction reports complete before latch. **Default stays 1.**
+- `powermetrics`: the busy core runs at **~550 MHz of ~3.68 GHz** nominal. The remaining lag is CPU power management
+  (next: WTLLegionCpuPower, `scripts/cpu-apply.sh`). GPU clock readout/floor sysctls (`debug.xegfx_gt_freq`,
+  `debug.xegfx_gt_min_mhz`) are in `driver/` but not yet tested.
 
 ## Counters
 
@@ -44,4 +46,6 @@ sysctl debug.nvaccel_xe_k9_free debug.nvaccel_xe_k9_mark debug.nvaccel_xe_k9_idl
        debug.nvaccel_xe_k9_max_us debug.nvaccel_surface_gpu_timeouts
 ```
 Live switches (no restart): `debug.nvaccel_xe_flip=0` (copy path), `debug.nvaccel_surface_gpu_on=0`
-(WindowServer waits itself), `debug.nvaccel_xe_k9=0`, `debug.nvaccel_xe_idle_ms=N`.
+(WindowServer waits itself), `debug.nvaccel_xe_k9=0`, `debug.nvaccel_xe_idle_ms=N`, `debug.nvaccel_xe_flip_hold=1|2|0`.
+
+Fixed frame-rate test: `sudo bash /Volumes/1401/xegfx-e16/fps-check.sh bench` (build `ca_bench` with `scripts/bench/build-bench.sh`).

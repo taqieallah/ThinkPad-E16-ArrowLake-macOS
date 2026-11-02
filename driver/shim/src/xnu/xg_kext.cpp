@@ -714,6 +714,39 @@ xegfx_fd_sysctl(struct sysctl_oid *, void *, int, struct sysctl_req *req)
 	xg_fd_diag(b, sizeof(b));
 	return SYSCTL_OUT(req, b, strlen(b) + 1);
 }
+/* E16: GT clock (MHz) and a floor to test whether a clocked-down GPU is what makes the desktop lag */
+static int gGtMinMhz;
+static int
+xegfx_gt_freq_sysctl(struct sysctl_oid *, void *, int, struct sysctl_req *req)
+{
+	char b[128];
+	int act = 0, rq = 0, mn = 0, mx = 0, rp0 = 0, slpc = 0;
+
+	if (xg_i915_freq(&act, &rq, &mn, &mx, &rp0, &slpc) != 0)
+		strlcpy(b, "no i915", sizeof(b));
+	else
+		snprintf(b, sizeof(b), "act=%d req=%d min=%d max=%d rp0=%d slpc=%d", act, rq, mn, mx, rp0, slpc);
+	return SYSCTL_OUT(req, b, strlen(b) + 1);
+}
+static int
+xegfx_gt_min_sysctl(struct sysctl_oid *oidp, void *, int, struct sysctl_req *req)
+{
+	int v = gGtMinMhz, err = sysctl_handle_int(oidp, &v, 0, req);
+
+	if (err || !req->newptr)
+		return err;
+	if (v < 0 || v > 4000)
+		return EINVAL;
+	err = xg_i915_set_min_freq(v);
+	if (err)
+		return EIO;
+	gGtMinMhz = v;
+	return 0;
+}
+SYSCTL_PROC(_debug, OID_AUTO, xegfx_gt_freq, CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_LOCKED, nullptr, 0, xegfx_gt_freq_sysctl, "A",
+    "E16: GT clock MHz: actual, requested, min, max, RP0, SLPC in use");
+SYSCTL_PROC(_debug, OID_AUTO, xegfx_gt_min_mhz, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED, nullptr, 0, xegfx_gt_min_sysctl, "I",
+    "E16: write a GT clock floor in MHz (e.g. RP0 = always full speed)");
 extern "C" void xg_mem_diag(char *buf, unsigned long len);
 static int
 xegfx_mem_sysctl(struct sysctl_oid *, void *, int, struct sysctl_req *req)
@@ -739,7 +772,7 @@ SYSCTL_STRING(_debug, OID_AUTO, xegfx_env, CTLFLAG_RW | CTLFLAG_LOCKED, xg_env, 
     "tunables for the stages, name=value pairs");
 
 static struct sysctl_oid *const gOids[] = {
-	&sysctl__debug_xegfx_stage, &sysctl__debug_xegfx_results, &sysctl__debug_xegfx_fd, &sysctl__debug_xegfx_mem, &sysctl__debug_xegfx_running,
+	&sysctl__debug_xegfx_stage, &sysctl__debug_xegfx_results, &sysctl__debug_xegfx_fd, &sysctl__debug_xegfx_mem, &sysctl__debug_xegfx_gt_freq, &sysctl__debug_xegfx_gt_min_mhz, &sysctl__debug_xegfx_running,
 	&sysctl__debug_xegfx_progress, &sysctl__debug_xegfx_wdog, &sysctl__debug_xegfx_env, &sysctl__debug_xegfx_log,
 	&sysctl__debug_xegfx_hold,
 	&sysctl__debug_xegfx_trace,

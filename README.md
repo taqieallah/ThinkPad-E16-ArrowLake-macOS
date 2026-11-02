@@ -16,7 +16,7 @@ NullMoth's Metal plugin and translator, Mesa ANV) with the E16 changes in this r
 | Internal panel 1920×1200 | Working at a measured **60.01 Hz** (157.5 MHz, 2120×1238 total) |
 | Zero-copy scanout (GGTT flip) | **Working**: frames scanned out of their own pages, 0 misses / 0 failures |
 | K9b deferred ordering | **Working**: WindowServer no longer waits per frame, 0 forced, 0 timeouts |
-| Desktop smoothness | Better than the copy path but **not yet 60 fps**; next step is a WindowServer profile |
+| Desktop smoothness | ~43–53 fps in a fixed test; **CPU stuck near 550 MHz** is the remaining lag (fix in progress, see HANDOFF.md) |
 | Icon / colour corruption | Fixed by the macOS update (+ `INTEL_DEBUG=noccs,nofc`) |
 | Touchpad, battery, sound | Working (VoodooI2C chain, ECEnabler + SMCBatteryManager, AppleALC layout 11) |
 | Wi-Fi (Intel BE201 `8086:7740`) | Working after the macOS update (AirportItlwm build) |

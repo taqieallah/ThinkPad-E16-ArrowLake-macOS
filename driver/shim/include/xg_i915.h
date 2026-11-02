@@ -52,6 +52,8 @@ int xg_i915_store(struct xg_i915_store *sd, int timeout_ms);
 int xg_i915_reserve_bootfb(unsigned long long offset, unsigned long long size);
 /* 1 when every uabi engine is idle, 0 busy, -ENODEV without an i915 device; does not sleep */
 int xg_i915_idle(void);
+int xg_i915_freq(int *act, int *req, int *min, int *max, int *rp0, int *slpc);   /* E16: MHz */
+int xg_i915_set_min_freq(int mhz);
 #define XG_FLIP_MAX_SLOTS	8
 /* zero-copy scanout: reserve GGTT slots, then point one slot's PTEs at a frame's physical pages; 0 or -errno */
 int xg_flip_init(unsigned long long surface_bytes, unsigned int slots, unsigned long long *ggtt_out,

@@ -86,6 +86,6 @@ cp "$W/out/plugin/NVMTLDriver" "$UP/NVMTLDriver"; codesign -f -s - "$UP/NVMTLDri
 if [ -d /Volumes/1401/xegfx-e16 ]; then D=/Volumes/1401/xegfx-e16
   for k in XeGfx XeGfxAccel; do rm -rf "$D/kexts/$k.kext"; ditto --norsrc --noextattr "$UP/kexts/$k.kext" "$D/kexts/$k.kext"; done
   cp "$UP/NVMTLDriver" "$D/NVMTLDriver"; cp "$UP/NVMTLDriver" "$D/userland/NVMTLDriver"
-  cp "$HERE/full-install.sh" "$UP/xe-up.sh" "$D/"; dot_clean "$D" 2>/dev/null || true; log "copied to the USB stick"
+  cp "$HERE/full-install.sh" "$UP/xe-up.sh" "$UP/fps-check.sh" "$D/"; dot_clean "$D" 2>/dev/null || true; log "copied to the USB stick"
 else log "USB not mounted: copy kexts/XeGfx.kext, kexts/XeGfxAccel.kext, NVMTLDriver, core/full-install.sh, xe-up.sh by hand"; fi
 log DONE

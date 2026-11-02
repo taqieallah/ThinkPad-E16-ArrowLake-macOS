@@ -11,7 +11,7 @@ index b5be732..ee77a4c 100644
  OSDefineMetaClassAndStructors(NVDisplayPipe, IOAccelLegacyDisplayPipe)
  class NVGLContext : public IOAccelGLContext2 {
 diff --git a/kexts/XeGfxAccel/accel/nvrm-accel.cpp b/kexts/XeGfxAccel/accel/nvrm-accel.cpp
-index 53f52af..2d343fd 100644
+index 53f52af..c49f60b 100644
 --- a/kexts/XeGfxAccel/accel/nvrm-accel.cpp
 +++ b/kexts/XeGfxAccel/accel/nvrm-accel.cpp
 @@ -31,6 +31,10 @@
@@ -67,24 +67,33 @@ index 53f52af..2d343fd 100644
      IOAccelLegacyDisplayPipe::free();
  }
  
-@@ -1313,10 +1342,15 @@ IOReturn NVDisplayPipe::validateTransaction(IOAccelDisplayPipeTransaction2 *)
+@@ -1313,10 +1342,24 @@ IOReturn NVDisplayPipe::validateTransaction(IOAccelDisplayPipeTransaction2 *)
  }
  
  static bool nvAccelIopAsyncBusy(const void *pipe);
 +static bool nvXeCopyBusy(const void *pipe);
 +static bool nvXeCopyQueue(NVDisplayPipe *pipe, IOService *fb, unsigned head, IOSurface *s);
++static bool nvXeCopyQueued(const void *pipe);   // E16: a frame waits behind the one in flight
 +static int gXeAsyncCopy = 1;
++static int gXeFlipHold = 1;   // E16: see isTransactionComplete
 +static int gXeCopyHold = 0;   // E16: 1 = the transaction stays incomplete until the worker has copied it
 +static int nvXeFlipOn(void);
  bool NVDisplayPipe::isTransactionComplete(IOAccelDisplayPipeTransaction2 *)
  {
      NVPIPE_CNT(gCntPipeComplete);
 -    return gNvIop != 0 && !nvAccelIopAsyncBusy(this);
-+    return gNvIop != 0 && !nvAccelIopAsyncBusy(this) && !((gXeCopyHold || nvXeFlipOn()) && nvXeCopyBusy(this));
++    // E16 flip-hold: with debug.nvaccel_xe_flip_hold=0 WindowServer may hand over frame N+1 while the worker is still
++    // latching frame N (pipeline depth 2); each frame is still signalled only after it latched, so the previous buffer
++    // is free when WindowServer hears about it. 1 = one frame in flight (as before).
++    // flip_hold=2: depth 2 without drops - one frame latching plus one queued; the next transaction waits only while
++    // a frame is already queued behind the one in flight (hold=0 let newer frames replace queued ones: dropped frames).
++    if (nvXeFlipOn() && gXeFlipHold == 2 && !gXeCopyHold)
++        return gNvIop != 0 && !nvAccelIopAsyncBusy(this) && !nvXeCopyQueued(this);
++    return gNvIop != 0 && !nvAccelIopAsyncBusy(this) && !((gXeCopyHold || (nvXeFlipOn() && gXeFlipHold)) && nvXeCopyBusy(this));
  }
  
  static void nvAccelSurfScanoutSync(IOSurface *s);
-@@ -1569,10 +1603,18 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
+@@ -1569,10 +1612,18 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
          OSAddAtomic64(1, &gCntIopSrcSurf); OSAddAtomic64(1, &gCntIopOk); OSAddAtomic64(1, &gCntIopOkHead[head]);
          return kIOReturnSuccess;
      } else if (s) {
@@ -103,7 +112,7 @@ index 53f52af..2d343fd 100644
          nvSurfWaitReady(s->getSurfaceID());   // a copied frame is read here, so its GPU work must be done first
          if (!nvAccelSurfCopyReady(s, head)) return kIOReturnSuccess;
          const unsigned fmt = s->getPixelFormat();
-@@ -1890,6 +1932,23 @@ static void nvaccelInstallSysctl(void)
+@@ -1890,6 +1941,24 @@ static void nvaccelInstallSysctl(void)
            sysctl__debug_nvaccel_pipe_complete, sysctl__debug_nvaccel_pipe_perform;
        sysctl_register_oid(&sysctl__debug_nvaccel_pipe_init);     sysctl_register_oid(&sysctl__debug_nvaccel_pipe_validate);
        sysctl_register_oid(&sysctl__debug_nvaccel_pipe_complete); sysctl_register_oid(&sysctl__debug_nvaccel_pipe_perform); }
@@ -118,6 +127,7 @@ index 53f52af..2d343fd 100644
 +      sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_clflush);
 +      sysctl_register_oid(&sysctl__debug_nvaccel_xe_flips); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_miss);
 +      sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_fail); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_home); }   // E16 flip
++    { extern struct sysctl_oid sysctl__debug_nvaccel_xe_flip_hold; sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_hold); }
 +    { extern struct sysctl_oid sysctl__debug_nvaccel_xe_k9, sysctl__debug_nvaccel_xe_idle_ms, sysctl__debug_nvaccel_xe_k9_free,
 +          sysctl__debug_nvaccel_xe_k9_mark, sysctl__debug_nvaccel_xe_k9_idle, sysctl__debug_nvaccel_xe_k9_forced, sysctl__debug_nvaccel_xe_k9_max_us;
 +      sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9); sysctl_register_oid(&sysctl__debug_nvaccel_xe_idle_ms);
@@ -127,7 +137,7 @@ index 53f52af..2d343fd 100644
      nvXeTraceStart();
  #endif
      sysctl_register_oid(&sysctl__debug_nvaccel_heads_published); sysctl_register_oid(&sysctl__debug_nvaccel_heads_registered);
-@@ -1967,7 +2026,9 @@ static IOReturn nvAccelGpuVaCall(const char *fn, struct NVRMGpuVaRequest *g)
+@@ -1967,7 +2036,9 @@ static IOReturn nvAccelGpuVaCall(const char *fn, struct NVRMGpuVaRequest *g)
      return r;
  }
  
@@ -137,7 +147,7 @@ index 53f52af..2d343fd 100644
  #include "../nvrm_surfshare_abi.h"
  extern "C" {
  void *_ZN13IOSurfaceRoot13lookupSurfaceEjP4task(void *root, unsigned int id, task_t task);
-@@ -3010,6 +3071,261 @@ static bool nvAccelFlipTo(IOAccelResource2 *res)
+@@ -3010,6 +3081,266 @@ static bool nvAccelFlipTo(IOAccelResource2 *res)
      return true;
  }
  
@@ -162,6 +172,10 @@ index 53f52af..2d343fd 100644
 +static bool nvXeCopyBusy(const void *pipe)
 +{
 +    return __atomic_load_n(&gXeCopy.busy, __ATOMIC_ACQUIRE) && gXeCopy.pipe == pipe;
++}
++static bool nvXeCopyQueued(const void *pipe)
++{
++    return nvXeCopyBusy(pipe) && __atomic_load_n((IOSurface *volatile *)&gXeCopy.next, __ATOMIC_ACQUIRE) != nullptr;
 +}
 +static void nvXeCopyRun(void *, void *)
 +{
@@ -218,6 +232,7 @@ index 53f52af..2d343fd 100644
 +static unsigned long long gXeFlipBytes; static uint32_t gXeFlipOrigSurf; static int gXeFlipPipe = -1;
 +static IOSurface *gXeFlipFront, *gXeFlipPrev;
 +static IOService *gXeFlipRes;
++SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip_hold, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlipHold, 0, "E16: 1 = one frame in flight (default); 2 = one in flight + one queued, none dropped; 0 = no wait, newest wins (drops)");
 +SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlip, 0, "E16: 1 = scan the composited frame out of its own pages through a GGTT slot (no copy; needs XeGfx core with xgFlipInit)");
 +SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip_clflush, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlipClflush, 0, "E16: 1 = flush the frame from the CPU caches before the plane scans it (default)");
 +SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_flips, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeFlips, "E16: frames put on the panel by a zero-copy flip");
@@ -599,15 +614,17 @@ index 8a7accc..4a6ca81 100644
      return 0;
  }
 diff --git a/shim/include/xg_i915.h b/shim/include/xg_i915.h
-index 9576a59..cc52042 100644
+index 9576a59..f90d73d 100644
 --- a/shim/include/xg_i915.h
 +++ b/shim/include/xg_i915.h
-@@ -50,6 +50,15 @@ void xg_i915_map_init(void);
+@@ -50,6 +50,17 @@ void xg_i915_map_init(void);
  int xg_i915_store(struct xg_i915_store *sd, int timeout_ms);
  /* keep i915 off the GGTT range the boot surface scans out of (Hybrid, display disabled); 0 or a negative errno */
  int xg_i915_reserve_bootfb(unsigned long long offset, unsigned long long size);
 +/* 1 when every uabi engine is idle, 0 busy, -ENODEV without an i915 device; does not sleep */
 +int xg_i915_idle(void);
++int xg_i915_freq(int *act, int *req, int *min, int *max, int *rp0, int *slpc);   /* E16: MHz */
++int xg_i915_set_min_freq(int mhz);
 +#define XG_FLIP_MAX_SLOTS	8
 +/* zero-copy scanout: reserve GGTT slots, then point one slot's PTEs at a frame's physical pages; 0 or -errno */
 +int xg_flip_init(unsigned long long surface_bytes, unsigned int slots, unsigned long long *ggtt_out,
@@ -619,7 +636,7 @@ index 9576a59..cc52042 100644
  #ifdef __cplusplus
  }
 diff --git a/shim/src/xnu/xg_kext.cpp b/shim/src/xnu/xg_kext.cpp
-index c459699..2b3c580 100644
+index c459699..846513f 100644
 --- a/shim/src/xnu/xg_kext.cpp
 +++ b/shim/src/xnu/xg_kext.cpp
 @@ -154,6 +154,29 @@ XeGfxResident::callPlatformFunction(const OSSymbol *name, bool wait, void *p1, v
@@ -662,6 +679,55 @@ index c459699..2b3c580 100644
  		gStage = s;
  	}
  	IOLockUnlock(gStageLock);
+@@ -692,6 +714,39 @@ xegfx_fd_sysctl(struct sysctl_oid *, void *, int, struct sysctl_req *req)
+ 	xg_fd_diag(b, sizeof(b));
+ 	return SYSCTL_OUT(req, b, strlen(b) + 1);
+ }
++/* E16: GT clock (MHz) and a floor to test whether a clocked-down GPU is what makes the desktop lag */
++static int gGtMinMhz;
++static int
++xegfx_gt_freq_sysctl(struct sysctl_oid *, void *, int, struct sysctl_req *req)
++{
++	char b[128];
++	int act = 0, rq = 0, mn = 0, mx = 0, rp0 = 0, slpc = 0;
++
++	if (xg_i915_freq(&act, &rq, &mn, &mx, &rp0, &slpc) != 0)
++		strlcpy(b, "no i915", sizeof(b));
++	else
++		snprintf(b, sizeof(b), "act=%d req=%d min=%d max=%d rp0=%d slpc=%d", act, rq, mn, mx, rp0, slpc);
++	return SYSCTL_OUT(req, b, strlen(b) + 1);
++}
++static int
++xegfx_gt_min_sysctl(struct sysctl_oid *oidp, void *, int, struct sysctl_req *req)
++{
++	int v = gGtMinMhz, err = sysctl_handle_int(oidp, &v, 0, req);
++
++	if (err || !req->newptr)
++		return err;
++	if (v < 0 || v > 4000)
++		return EINVAL;
++	err = xg_i915_set_min_freq(v);
++	if (err)
++		return EIO;
++	gGtMinMhz = v;
++	return 0;
++}
++SYSCTL_PROC(_debug, OID_AUTO, xegfx_gt_freq, CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_LOCKED, nullptr, 0, xegfx_gt_freq_sysctl, "A",
++    "E16: GT clock MHz: actual, requested, min, max, RP0, SLPC in use");
++SYSCTL_PROC(_debug, OID_AUTO, xegfx_gt_min_mhz, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED, nullptr, 0, xegfx_gt_min_sysctl, "I",
++    "E16: write a GT clock floor in MHz (e.g. RP0 = always full speed)");
+ extern "C" void xg_mem_diag(char *buf, unsigned long len);
+ static int
+ xegfx_mem_sysctl(struct sysctl_oid *, void *, int, struct sysctl_req *req)
+@@ -717,7 +772,7 @@ SYSCTL_STRING(_debug, OID_AUTO, xegfx_env, CTLFLAG_RW | CTLFLAG_LOCKED, xg_env,
+     "tunables for the stages, name=value pairs");
+ 
+ static struct sysctl_oid *const gOids[] = {
+-	&sysctl__debug_xegfx_stage, &sysctl__debug_xegfx_results, &sysctl__debug_xegfx_fd, &sysctl__debug_xegfx_mem, &sysctl__debug_xegfx_running,
++	&sysctl__debug_xegfx_stage, &sysctl__debug_xegfx_results, &sysctl__debug_xegfx_fd, &sysctl__debug_xegfx_mem, &sysctl__debug_xegfx_gt_freq, &sysctl__debug_xegfx_gt_min_mhz, &sysctl__debug_xegfx_running,
+ 	&sysctl__debug_xegfx_progress, &sysctl__debug_xegfx_wdog, &sysctl__debug_xegfx_env, &sysctl__debug_xegfx_log,
+ 	&sysctl__debug_xegfx_hold,
+ 	&sysctl__debug_xegfx_trace,
 diff --git a/tools/kexport.py b/tools/kexport.py
 index 2691b1a..1b1cfe3 100755
 --- a/tools/kexport.py
@@ -723,10 +789,18 @@ index a0ac00b..00da797 100644
                      "native emitter: float32 bit literal f0x{bits:08x} used as non-float type {other:?}"
                  )),
 diff --git a/xkpi/src/i915/xg_i915_exec.c b/xkpi/src/i915/xg_i915_exec.c
-index 916fcfc..4d65cac 100644
+index 916fcfc..3ecb373 100644
 --- a/xkpi/src/i915/xg_i915_exec.c
 +++ b/xkpi/src/i915/xg_i915_exec.c
-@@ -35,6 +35,14 @@ xg_i915_find(struct pci_dev **pdevp)
+@@ -18,6 +18,7 @@
+ #include "gt/intel_gt.h"
+ #include "gt/uc/intel_uc.h"
+ #include "gt/intel_gtt.h"
++#include "gt/intel_rps.h"
+ #include "i915_gem_gtt.h"
+ 
+ #include "xg_i915.h"
+@@ -35,6 +36,14 @@ xg_i915_find(struct pci_dev **pdevp)
  	return (NULL);
  }
  
@@ -741,7 +815,7 @@ index 916fcfc..4d65cac 100644
  int
  xg_i915_state(struct xg_i915_state *st)
  {
-@@ -65,7 +73,7 @@ xg_i915_state(struct xg_i915_state *st)
+@@ -65,7 +74,7 @@ xg_i915_state(struct xg_i915_state *st)
  		st->engines++;
  	if (i915->drm.render != NULL)
  		st->render_minor = i915->drm.render->index;
@@ -750,7 +824,7 @@ index 916fcfc..4d65cac 100644
  	return (0);
  }
  
-@@ -90,7 +98,7 @@ xg_i915_gtawake(int level)
+@@ -90,7 +99,7 @@ xg_i915_gtawake(int level)
  			intel_uncore_forcewake_user_get(gt->uncore);
  		n++;
  	}
@@ -759,7 +833,7 @@ index 916fcfc..4d65cac 100644
  	printf("xegfx: gtawake %d held on %d GTs\n", level, n);
  	return (n);
  }
-@@ -130,7 +138,7 @@ xg_i915_exec(struct xg_i915_exec *ex, int timeout_ms)
+@@ -130,7 +139,7 @@ xg_i915_exec(struct xg_i915_exec *ex, int timeout_ms)
  		else
  			ex->done++;
  	}
@@ -768,7 +842,7 @@ index 916fcfc..4d65cac 100644
  	return (0);
  }
  
-@@ -190,7 +198,7 @@ xg_i915_store(struct xg_i915_store *sd, int timeout_ms)
+@@ -190,7 +199,7 @@ xg_i915_store(struct xg_i915_store *sd, int timeout_ms)
  		else
  			sd->ok++;
  	}
@@ -777,7 +851,7 @@ index 916fcfc..4d65cac 100644
  	return (0);
  }
  
-@@ -220,3 +228,29 @@ xg_i915_reserve_bootfb(unsigned long long offset, unsigned long long size)
+@@ -220,3 +229,64 @@ xg_i915_reserve_bootfb(unsigned long long offset, unsigned long long size)
  	mutex_unlock(&ggtt->vm.mutex);
  	return (err);
  }
@@ -806,6 +880,41 @@ index 916fcfc..4d65cac 100644
 +			return (0);
 +	}
 +	return (1);
++}
++
++/*
++ * E16: GT frequency, for "is the GPU clocked down?" (debug.xegfx_gt_freq) and a floor to test with
++ * (debug.xegfx_gt_min_mhz). With GuC submission the GuC's SLPC owns the clock; intel_rps_set_min_frequency sends it
++ * the new floor. act is 0 while the GT is asleep.
++ */
++int
++xg_i915_freq(int *act, int *req, int *min, int *max, int *rp0, int *slpc)
++{
++	struct pci_dev *pdev = NULL;
++	struct drm_i915_private *i915 = xg_i915_find(&pdev);
++	struct intel_rps *rps;
++
++	if (!i915)
++		return (-ENODEV);
++	rps = &to_gt(i915)->rps;
++	*act = (int)intel_rps_read_actual_frequency(rps);
++	*req = (int)intel_rps_get_requested_frequency(rps);
++	*min = (int)intel_rps_get_min_frequency(rps);
++	*max = (int)intel_rps_get_max_frequency(rps);
++	*rp0 = (int)intel_rps_get_rp0_frequency(rps);
++	*slpc = intel_uc_uses_guc_slpc(&to_gt(i915)->uc) ? 1 : 0;
++	return (0);
++}
++
++int
++xg_i915_set_min_freq(int mhz)
++{
++	struct pci_dev *pdev = NULL;
++	struct drm_i915_private *i915 = xg_i915_find(&pdev);
++
++	if (!i915)
++		return (-ENODEV);
++	return (intel_rps_set_min_frequency(&to_gt(i915)->rps, (u32)mhz));
 +}
 diff --git a/xkpi/src/i915/xg_i915_flip.c b/xkpi/src/i915/xg_i915_flip.c
 new file mode 100644

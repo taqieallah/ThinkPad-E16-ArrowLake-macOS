@@ -18,6 +18,7 @@
 #include "gt/intel_gt.h"
 #include "gt/uc/intel_uc.h"
 #include "gt/intel_gtt.h"
+#include "gt/intel_rps.h"
 #include "i915_gem_gtt.h"
 
 #include "xg_i915.h"
@@ -253,4 +254,39 @@ xg_i915_idle(void)
 			return (0);
 	}
 	return (1);
+}
+
+/*
+ * E16: GT frequency, for "is the GPU clocked down?" (debug.xegfx_gt_freq) and a floor to test with
+ * (debug.xegfx_gt_min_mhz). With GuC submission the GuC's SLPC owns the clock; intel_rps_set_min_frequency sends it
+ * the new floor. act is 0 while the GT is asleep.
+ */
+int
+xg_i915_freq(int *act, int *req, int *min, int *max, int *rp0, int *slpc)
+{
+	struct pci_dev *pdev = NULL;
+	struct drm_i915_private *i915 = xg_i915_find(&pdev);
+	struct intel_rps *rps;
+
+	if (!i915)
+		return (-ENODEV);
+	rps = &to_gt(i915)->rps;
+	*act = (int)intel_rps_read_actual_frequency(rps);
+	*req = (int)intel_rps_get_requested_frequency(rps);
+	*min = (int)intel_rps_get_min_frequency(rps);
+	*max = (int)intel_rps_get_max_frequency(rps);
+	*rp0 = (int)intel_rps_get_rp0_frequency(rps);
+	*slpc = intel_uc_uses_guc_slpc(&to_gt(i915)->uc) ? 1 : 0;
+	return (0);
+}
+
+int
+xg_i915_set_min_freq(int mhz)
+{
+	struct pci_dev *pdev = NULL;
+	struct drm_i915_private *i915 = xg_i915_find(&pdev);
+
+	if (!i915)
+		return (-ENODEV);
+	return (intel_rps_set_min_frequency(&to_gt(i915)->rps, (u32)mhz));
 }

@@ -1344,13 +1344,22 @@ IOReturn NVDisplayPipe::validateTransaction(IOAccelDisplayPipeTransaction2 *)
 static bool nvAccelIopAsyncBusy(const void *pipe);
 static bool nvXeCopyBusy(const void *pipe);
 static bool nvXeCopyQueue(NVDisplayPipe *pipe, IOService *fb, unsigned head, IOSurface *s);
+static bool nvXeCopyQueued(const void *pipe);   // E16: a frame waits behind the one in flight
 static int gXeAsyncCopy = 1;
+static int gXeFlipHold = 1;   // E16: see isTransactionComplete
 static int gXeCopyHold = 0;   // E16: 1 = the transaction stays incomplete until the worker has copied it
 static int nvXeFlipOn(void);
 bool NVDisplayPipe::isTransactionComplete(IOAccelDisplayPipeTransaction2 *)
 {
     NVPIPE_CNT(gCntPipeComplete);
-    return gNvIop != 0 && !nvAccelIopAsyncBusy(this) && !((gXeCopyHold || nvXeFlipOn()) && nvXeCopyBusy(this));
+    // E16 flip-hold: with debug.nvaccel_xe_flip_hold=0 WindowServer may hand over frame N+1 while the worker is still
+    // latching frame N (pipeline depth 2); each frame is still signalled only after it latched, so the previous buffer
+    // is free when WindowServer hears about it. 1 = one frame in flight (as before).
+    // flip_hold=2: depth 2 without drops - one frame latching plus one queued; the next transaction waits only while
+    // a frame is already queued behind the one in flight (hold=0 let newer frames replace queued ones: dropped frames).
+    if (nvXeFlipOn() && gXeFlipHold == 2 && !gXeCopyHold)
+        return gNvIop != 0 && !nvAccelIopAsyncBusy(this) && !nvXeCopyQueued(this);
+    return gNvIop != 0 && !nvAccelIopAsyncBusy(this) && !((gXeCopyHold || (nvXeFlipOn() && gXeFlipHold)) && nvXeCopyBusy(this));
 }
 
 static void nvAccelSurfScanoutSync(IOSurface *s);
@@ -1943,6 +1952,7 @@ static void nvaccelInstallSysctl(void)
       sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_clflush);
       sysctl_register_oid(&sysctl__debug_nvaccel_xe_flips); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_miss);
       sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_fail); sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_home); }   // E16 flip
+    { extern struct sysctl_oid sysctl__debug_nvaccel_xe_flip_hold; sysctl_register_oid(&sysctl__debug_nvaccel_xe_flip_hold); }
     { extern struct sysctl_oid sysctl__debug_nvaccel_xe_k9, sysctl__debug_nvaccel_xe_idle_ms, sysctl__debug_nvaccel_xe_k9_free,
           sysctl__debug_nvaccel_xe_k9_mark, sysctl__debug_nvaccel_xe_k9_idle, sysctl__debug_nvaccel_xe_k9_forced, sysctl__debug_nvaccel_xe_k9_max_us;
       sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9); sysctl_register_oid(&sysctl__debug_nvaccel_xe_idle_ms);
@@ -3093,6 +3103,10 @@ static bool nvXeCopyBusy(const void *pipe)
 {
     return __atomic_load_n(&gXeCopy.busy, __ATOMIC_ACQUIRE) && gXeCopy.pipe == pipe;
 }
+static bool nvXeCopyQueued(const void *pipe)
+{
+    return nvXeCopyBusy(pipe) && __atomic_load_n((IOSurface *volatile *)&gXeCopy.next, __ATOMIC_ACQUIRE) != nullptr;
+}
 static void nvXeCopyRun(void *, void *)
 {
     NVXeCopy *e = &gXeCopy;
@@ -3148,6 +3162,7 @@ static unsigned long long gXeFlipGgtt[8]; static unsigned gXeFlipSlots, gXeFlipN
 static unsigned long long gXeFlipBytes; static uint32_t gXeFlipOrigSurf; static int gXeFlipPipe = -1;
 static IOSurface *gXeFlipFront, *gXeFlipPrev;
 static IOService *gXeFlipRes;
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip_hold, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlipHold, 0, "E16: 1 = one frame in flight (default); 2 = one in flight + one queued, none dropped; 0 = no wait, newest wins (drops)");
 SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlip, 0, "E16: 1 = scan the composited frame out of its own pages through a GGTT slot (no copy; needs XeGfx core with xgFlipInit)");
 SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip_clflush, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlipClflush, 0, "E16: 1 = flush the frame from the CPU caches before the plane scans it (default)");
 SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_flips, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeFlips, "E16: frames put on the panel by a zero-copy flip");
