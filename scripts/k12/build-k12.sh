@@ -46,7 +46,7 @@ endian = 'little'
 INI
 meson setup "$D/build" "$D" --cross-file "$D/x86.ini" --prefix="$D/prefix" --libdir=lib -Dbuildtype=release \
   -Dintel=disabled -Damdgpu=disabled -Dradeon=disabled -Dnouveau=disabled -Dvmwgfx=disabled -Domap=disabled \
-  -Dexynos=disabled -Dtegra=disabled -Dvc4=disabled -Detnaviv=disabled -Dfreedreno=disabled \
+  -Dexynos=disabled -Dtegra=disabled -Detnaviv=disabled \
   -Dcairo-tests=disabled -Dman-pages=disabled -Dvalgrind=disabled -Dtests=false -Dinstall-test-programs=false >> "$L" 2>&1 \
   || { tail -30 "$L"; echo "LIBDRM CONFIGURE FAILED"; exit 1; }
 ninja -C "$D/build" >> "$L" 2>&1 || { tail -30 "$L"; echo "LIBDRM BUILD FAILED"; exit 1; }
