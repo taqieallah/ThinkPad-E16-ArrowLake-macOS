@@ -116,8 +116,11 @@ int main(int argc, char **argv) {
         if (!dev) { std::printf("%s: FAIL no device\n", argv[1]); return 1; }
         std::printf("%s device: %s (open %.1f ms)\n", argv[1], dev.name.UTF8String, ms(now() - t0));
         const char *label = isNew ? "NEW(m2v)" : "OLD(nvmtl)";
-        run(dev, label, false, 120);
-        run(dev, label, true, 120);
+        // XE_FRAMES: frames per scene (default 120); XE_SCENE=plain|blur: only that scene (k14c-profile samples a long run)
+        const int frames = getenv("XE_FRAMES") ? atoi(getenv("XE_FRAMES")) : 120;
+        const char *only = getenv("XE_SCENE");
+        if (!only || !strcmp(only, "plain")) run(dev, label, false, frames);
+        if (!only || !strcmp(only, "blur")) run(dev, label, true, frames);
         if (argc > 4 && argv[4][0]) {
             char out[2048] = {};
             native_bridge_metal_benchmark(dev, argv[4], 40, out, sizeof out);

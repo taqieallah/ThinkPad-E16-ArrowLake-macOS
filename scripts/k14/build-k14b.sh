@@ -31,6 +31,6 @@ clang++ -arch x86_64 -mmacosx-version-min=14.0 "$O/bench.o" "$O/frontend.o" "$A"
   -framework IOKit -framework Security -framework CoreFoundation -lc++ -lresolv >> "$L" 2>&1 \
   || { grep -E "Undefined|error|ld:" -A3 "$L" | head -40; echo "LINK FAILED (log $L)"; exit 1; }
 codesign -f -s - "$HERE/xe-m2v-bench" >> "$L" 2>&1; echo "    xe-m2v-bench $(stat -f %z "$HERE/xe-m2v-bench") B"
-if [ -d /Volumes/1401/xegfx-e16 ]; then T=/Volumes/1401/xegfx-e16/k14; mkdir -p "$T"; cp "$HERE/xe-m2v-bench" "$HERE/k14b-run.sh" "$T/"; dot_clean /Volumes/1401/xegfx-e16 2>/dev/null || true; echo "copied to $T"
+if [ -d /Volumes/1401/xegfx-e16 ]; then T=/Volumes/1401/xegfx-e16/k14; mkdir -p "$T"; cp "$HERE/xe-m2v-bench" "$HERE/k14b-run.sh" "$HERE/k14c-profile.sh" "$T/"; dot_clean /Volumes/1401/xegfx-e16 2>/dev/null || true; echo "copied to $T"
 else echo "USB not mounted: copy k14/xe-m2v-bench and k14/k14b-run.sh to the stick's xegfx-e16/k14"; fi
 echo DONE
