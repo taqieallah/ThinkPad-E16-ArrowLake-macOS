@@ -1,0 +1,23 @@
+[package]
+name = "xe-m2v-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+# K14 phase 1: AdrenoMetal's bridge self-test (metal2vulkan runtime, the UniXNU Metal stack) run on ANV through our libdrm,
+# without touching the system. The bridge sources and metal2vulkan are fetched by build-k14.sh, not copied here.
+
+[lib]
+name = "nmb"
+path = "deps/am/bridge/NativeMetalBridge.rs"
+
+[[bin]]
+name = "xe-m2v-probe"
+path = "src/main.rs"
+
+[dependencies]
+libc = "0.2"
+metal2vulkan = { path = "deps/m2v/crates/metal2vulkan" }
+metal2vulkan-runtime = { path = "deps/m2v/crates/metal2vulkan-runtime" }
+
+[profile.release]
+debug = 1
