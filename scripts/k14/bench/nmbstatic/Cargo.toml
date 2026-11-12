@@ -1,0 +1,19 @@
+[package]
+name = "nmbstatic"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "nmb"
+path = "deps/am/bridge/NativeMetalBridge.rs"
+crate-type = ["staticlib"]
+
+[dependencies]
+libc = "0.2"
+metal2vulkan = { path = "deps/m2v/crates/metal2vulkan" }
+metal2vulkan-runtime = { path = "deps/m2v/crates/metal2vulkan-runtime" }
+
+[profile.release]
+debug = 1
+panic = "unwind"
