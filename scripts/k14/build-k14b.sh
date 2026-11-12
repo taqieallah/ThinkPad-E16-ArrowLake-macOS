@@ -20,7 +20,10 @@ A=$S/target/x86_64-apple-darwin/release/libnmb.a; echo "    libnmb.a $(stat -f %
 echo ">>> 2/3 the AdrenoMetal frontend (x86_64, ARC)"
 O=$D/obj; mkdir -p "$O"
 CXX=(clang++ -arch x86_64 -mmacosx-version-min=14.0 -std=gnu++2b -fobjc-arc -O2 -g -w -I"$D/am" -I"$D/am/bridge")
-"${CXX[@]}" -c "$D/am/NativeBridgeMetalFrontend.mm" -o "$O/frontend.o" >> "$L" 2>&1 || { grep -E "error:" "$L" | head -30; echo "FRONTEND COMPILE FAILED (log $L)"; exit 1; }
+FE=$D/am/NativeBridgeMetalFrontend.x86.mm
+git -C "$D/am" show beeab71:NativeBridgeMetalFrontend.mm > "$FE"   # f6f3808 (diagnostics) left code outside its functions
+python3 "$HERE/bench/fix-frontend.py" "$FE" >> "$L"
+"${CXX[@]}" -c "$FE" -o "$O/frontend.o" >> "$L" 2>&1 || { grep -E "error:" "$L" | head -30; echo "FRONTEND COMPILE FAILED (log $L)"; exit 1; }
 echo ">>> 3/3 xe-m2v-bench"
 "${CXX[@]}" -c "$HERE/bench/xe_m2v_bench.mm" -o "$O/bench.o" >> "$L" 2>&1 || { grep -E "error:" "$L" | head -20; echo "BENCH COMPILE FAILED"; exit 1; }
 clang++ -arch x86_64 -mmacosx-version-min=14.0 "$O/bench.o" "$O/frontend.o" "$A" -o "$HERE/xe-m2v-bench" \
