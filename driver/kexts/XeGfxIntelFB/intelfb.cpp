@@ -234,7 +234,12 @@ class XeGfxIntelFramebuffer : public IONDRVFramebuffer {
     bool curSetup() {
         int off = 0;
         if (PE_parse_boot_argn("-xeintelfbnohwc", &off, sizeof off) || !fR) return false;
-        if (rd(XIFB_CUR_CTL) || rd(XIFB_P1_SURF) != 0xff000000u || rd(XIFB_P1_BUF) != 0x07ff0000u) {
+        // E16 0.9.5: the E16's GOP puts its framebuffer at 0xff600000, not 0xff000000. Any GOP block ending below our
+        // cursor pages is fine: the cursor PTEs then touch nothing the firmware or i915 maps.
+        const uint32_t surf = rd(XIFB_P1_SURF);
+        const uint64_t fbEnd = (uint64_t)surf + (uint64_t)fRowBytes * fH;
+        if (rd(XIFB_CUR_CTL) || surf < 0xff000000u || (surf & 0xfff) || !fRowBytes || !fH || fbEnd > XIFB_CUR_GGTT ||
+            rd(XIFB_P1_BUF) != 0x07ff0000u) {
             XIFBLOG("hw cursor off: display not as the GOP left it (cur %08x surf %08x buf %08x)", rd(XIFB_CUR_CTL),
                     rd(XIFB_P1_SURF), rd(XIFB_P1_BUF));
             return false;
