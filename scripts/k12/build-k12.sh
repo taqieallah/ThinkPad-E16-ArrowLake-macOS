@@ -63,7 +63,7 @@ clang -arch x86_64 -mmacosx-version-min=14.0 -I"$D/prefix/include" -I"$D/prefix/
 codesign -f -s - "$HERE/drmtest" >> "$L" 2>&1
 
 if [ -d /Volumes/1401/xegfx-e16 ]; then T=/Volumes/1401/xegfx-e16/k12; mkdir -p "$T"
-  cp "$HERE/libdrm.2.dylib" "$HERE/drmtest" "$HERE/k12-install.sh" "$HERE/k12-test.sh" "$T/"; dot_clean /Volumes/1401/xegfx-e16 2>/dev/null || true
+  cp "$HERE/libdrm.2.dylib" "$HERE/drmtest" "$HERE/k12-install.sh" "$HERE/k12-test.sh" "$HERE/xe-up-k12.sh" "$T/"; dot_clean /Volumes/1401/xegfx-e16 2>/dev/null || true
   echo "copied to the USB stick (kexts + plugin by build-core, k12/ by this script)"
 else echo "USB not mounted: copy kexts/, NVMTLDriver, full-install.sh and k12/ by hand"; fi
 echo DONE
