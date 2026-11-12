@@ -11,8 +11,16 @@ grep -q "xg_fd_task_open" "$WTL/shim/src/xnu/xg_fd.cpp" || { echo "STOP: K12 ker
 grep -q "selector 2 (kind 0 card" "$WTL/kexts/XeGfxAccel/accel/nvrm-accel.cpp" || { echo "STOP: K12 accel source missing"; exit 1; }
 grep -q "drmXeGfxOpendir" "$WTL/userland/patches/libdrm-xegfx.patch" || { echo "STOP: K12 libdrm patch missing"; exit 1; }
 
-echo ">>> 1/3 XeGfx core + XeGfxAccel + NVMTLDriver (core/build-core.sh, takes a while)"
-bash "$UP/core/build-core.sh" || { echo "CORE BUILD FAILED - see $UP/core/build-core.log"; exit 1; }
+echo ">>> 1/3 XeGfx core + XeGfxAccel + NVMTLDriver"
+if grep -aq xgDrmOpen "$UP/kexts/XeGfx.kext/Contents/MacOS/XeGfx" 2>/dev/null && grep -aq "XGDR open" "$UP/kexts/XeGfxAccel.kext/Contents/MacOS/XeGfxAccel" 2>/dev/null && [ -f "$UP/NVMTLDriver" ] && [ "${REBUILD:-0}" != 1 ]; then
+  echo "    already built (REBUILD=1 to build again)"
+  if [ -d /Volumes/1401/xegfx-e16 ]; then D=/Volumes/1401/xegfx-e16; mkdir -p "$D/kexts" "$D/userland"
+    for k in XeGfx XeGfxAccel; do rm -rf "$D/kexts/$k.kext"; ditto --norsrc --noextattr "$UP/kexts/$k.kext" "$D/kexts/$k.kext"; done
+    cp "$UP/NVMTLDriver" "$D/NVMTLDriver"; cp "$UP/NVMTLDriver" "$D/userland/NVMTLDriver"
+    cp "$UP/core/full-install.sh" "$UP/xe-up.sh" "$UP/fps-check.sh" "$UP/measure.py" "$UP/install-common.sh" "$D/"; fi
+else
+  bash "$UP/core/build-core.sh" || { echo "CORE BUILD FAILED - see $UP/core/build-core.log"; exit 1; }
+fi
 grep -aq "xgDrmOpen" "$UP/kexts/XeGfx.kext/Contents/MacOS/XeGfx" || { echo "STOP: built core has no xgDrmOpen"; exit 1; }
 grep -aq "XGDR open" "$UP/kexts/XeGfxAccel.kext/Contents/MacOS/XeGfxAccel" || { echo "STOP: built accel has no XGDR open"; exit 1; }
 
