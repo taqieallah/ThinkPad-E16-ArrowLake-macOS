@@ -4,7 +4,7 @@
 HERE=$(cd "$(dirname "$0")" && pwd); T=$HERE/drmtest; LIB=$(dirname "$(find /Library/GPUBundles -name libdrm.2.dylib | head -1)")
 [ -f "$HERE/drmtest" ] && [ -n "$LIB" ] || { echo "STOP: drmtest or the installed libdrm missing"; exit 1; }
 T=/tmp/k12-drmtest; cp "$HERE/drmtest" "$T"; chmod +x "$T"
-install_name_tool -change @rpath/libdrm.2.dylib "$LIB/libdrm.2.dylib" "$T" 2>/dev/null; codesign -f -s - "$T" >/dev/null 2>&1
+cp "$LIB/libdrm.2.dylib" /tmp/libdrm.2.dylib   # drmtest loads /tmp/libdrm.2.dylib: the installed one, copied
 echo "== 1) normal";            "$T"
 echo; echo "== 2) XEGFX_KOPEN=1";  XEGFX_KOPEN=1 "$T"
 echo; echo "== 3) sandbox without /dev/dri"

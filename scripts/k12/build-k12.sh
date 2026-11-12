@@ -60,6 +60,7 @@ echo "    libdrm.2.dylib $(stat -f %z "$HERE/libdrm.2.dylib") B"
 echo ">>> 3/3 drmtest"
 clang -arch x86_64 -mmacosx-version-min=14.0 -I"$D/prefix/include" -I"$D/prefix/include/libdrm" "$HERE/drmtest.c" \
   "$HERE/libdrm.2.dylib" -o "$HERE/drmtest" >> "$L" 2>&1 || { tail -10 "$L"; echo "DRMTEST BUILD FAILED"; exit 1; }
+install_name_tool -change @rpath/libdrm.2.dylib /tmp/libdrm.2.dylib "$HERE/drmtest"   # k12-test puts the installed libdrm there
 codesign -f -s - "$HERE/drmtest" >> "$L" 2>&1
 
 if [ -d /Volumes/1401/xegfx-e16 ]; then T=/Volumes/1401/xegfx-e16/k12; mkdir -p "$T"
