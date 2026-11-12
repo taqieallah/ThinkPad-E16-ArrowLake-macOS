@@ -154,6 +154,21 @@ XeGfxResident::callPlatformFunction(const OSSymbol *name, bool wait, void *p1, v
 		*(int *)p4 = xg_fd_remote_ioctl((int)(uintptr_t)p1, (unsigned long)p2, (unsigned long long)(uintptr_t)p3);
 		return kIOReturnSuccess;
 	}
+	/* E16 sandbox path, for apps whose sandbox refuses /dev/dri: "xgDrmOpen" (const char *node name, -, int *minor
+	 * out, int *errno), "xgDrmClose" (minor, pid that opened it, -, int *errno), "xgDrmNode" (index, char name[32]
+	 * out, unsigned *udev out, int *errno). Instances opened here are used through xgDrmIoctl like any other. */
+	if (name && name->isEqualTo("xgDrmOpen") && p1 && p3 && p4) {
+		*(int *)p4 = xg_fd_task_open((const char *)p1, (int *)p3);
+		return kIOReturnSuccess;
+	}
+	if (name && name->isEqualTo("xgDrmClose") && p4) {
+		*(int *)p4 = xg_fd_task_close((int)(uintptr_t)p1, (int)(uintptr_t)p2);
+		return kIOReturnSuccess;
+	}
+	if (name && name->isEqualTo("xgDrmNode") && p2 && p3 && p4) {
+		*(int *)p4 = xg_fd_task_node((int)(uintptr_t)p1, (char *)p2, 32, (unsigned int *)p3);
+		return kIOReturnSuccess;
+	}
 	/* "xgFlipInit" (surface bytes, slots wanted, u64 *ggtt out, unsigned *count out) / "xgFlipMap" (slot,
 	 * phys page array, npages, surface bytes) / "xgFlipUnmap" (slot, surface bytes): zero-copy scanout.  The
 	 * accelerator writes PLANE_SURF itself; this side owns the GGTT slots and the PTEs. */

@@ -1139,6 +1139,32 @@ xg_fd_inst_fget(int inst, struct file **fpp)
 	return (0);
 }
 
+/*
+ * E16 sandbox path: app sandboxes (Safari's WebContent and GPU processes, ordinary apps) refuse /dev/dri outright,
+ * so the XeGfxAccel user client opens an instance for them. With name set, the slot of that DRM node ("dri/renderD128");
+ * otherwise the idx-th live DRM node, its name copied to out. -1 when there is none.
+ */
+int
+xg_fd_node_slot(const char *name, int idx, char *out, unsigned long outlen)
+{
+	struct xg_fd_cdev *xc;
+	int slot = -1, n = 0;
+
+	xg_fd_lock();
+	LIST_FOREACH(xc, &xg_fd_names, xc_all) {
+		if (xc->xc_gone || strncmp(xc->xc_cdev.si_name, "dri/", 4) != 0)
+			continue;
+		if (name != NULL ? strcmp(xc->xc_cdev.si_name, name) == 0 : n++ == idx) {
+			slot = xc->xc_slot;
+			if (out != NULL && outlen > 0)
+				strlcpy(out, xc->xc_cdev.si_name, outlen);
+			break;
+		}
+	}
+	xg_fd_unlock();
+	return (slot);
+}
+
 int
 xg_fd_inst_owner(int inst)
 {

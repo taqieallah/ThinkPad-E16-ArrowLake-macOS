@@ -45,6 +45,16 @@ int	xg_fd_inst_owner(int inst);
  */
 int	xg_fd_remote_ioctl(int minor, unsigned long cmd, unsigned long long uarg);
 
+/*
+ * E16 sandbox path (no /dev/dri at all): the user client opens an instance of a DRM node for the calling process and
+ * hands back its instance minor, which xg_fd_remote_ioctl then accepts from that process. task_close takes the pid
+ * that opened it, so the client can close what a dead task left. task_node lists the DRM nodes. XNU errnos.
+ */
+int	xg_fd_node_slot(const char *name, int idx, char *out, unsigned long outlen);
+int	xg_fd_task_open(const char *name, int *minorp);
+int	xg_fd_task_close(int minor, int pid);
+int	xg_fd_task_node(int idx, char *name, unsigned long len, unsigned int *udevp);
+
 /* XNU side, called from xg_fd.c */
 int	xg_fd_xnu_node_create(int slot, unsigned int uid, unsigned int gid, int mode, const char *name,
 	    void **handlep);

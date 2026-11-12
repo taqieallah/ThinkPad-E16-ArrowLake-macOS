@@ -228,12 +228,112 @@ OSDefineMetaClassAndStructors(IOAccelNVRMCarrier, IOService)
 #ifdef NMX_XEGFX
 // WindowServer's sandbox lets it open /dev/dri read-only but never ioctl(2) a device node; it may open IOAccel*
 // user clients. libdrm sends its ioctls here with the minor of its read-only fd, XeGfx checks the caller opened it.
+//
+// E16 sandbox path: app sandboxes (Safari's WebContent and GPU processes, Calculator, every App Store app) refuse
+// /dev/dri outright, even read-only, but allow IOAccelerator user clients ("iokit-connection IOAccelerator"). This
+// client is one (NMXAccel's), so it does not subclass IOAccelerationUserClient, which WebKit's GPU process denies.
+// Selector 2 opens a DRM node instance for the caller with no vnode, selector 3 closes one, selector 4 lists the
+// nodes; libdrm then sends that instance's ioctls (mmap included: XeGfx maps BOs through ioctls) to selector 0.
+// Whatever a task leaves open is closed here when its connection goes (clientClose / clientDied).
+static IOService *xgResident() {
+    static IOService *res;
+    if (!res) { OSDictionary *m = IOService::serviceMatching("XeGfxResident"); if (m) { res = IOService::waitForMatchingService(m, 1000ULL * 1000 * 1000); m->release(); } }
+    return res;
+}
+static int xgResidentCall(const char *what, void *p1, void *p2, void *p3) {
+    IOService *res = xgResident();
+    if (!res) return ENXIO;
+    int err = EIO;
+    const OSSymbol *fn = OSSymbol::withCString(what);
+    if (!fn) return ENOMEM;
+    IOReturn r = res->callPlatformFunction(fn, false, p1, p2, p3, &err);
+    fn->release();
+    return r == kIOReturnSuccess ? err : ENXIO;
+}
+
 class IOAccelXeGfxDRMClient : public IOUserClient {
     OSDeclareDefaultStructors(IOAccelXeGfxDRMClient)
+    enum { kXgMaxOpen = 64 };
+    IOLock *fOpenLock = nullptr;
+    int     fOpenMinor[kXgMaxOpen] = {};
+    int     fOpenPid[kXgMaxOpen] = {};
+    void closeAll() {
+        if (!fOpenLock) return;
+        for (unsigned i = 0; i < kXgMaxOpen; i++) {
+            IOLockLock(fOpenLock);
+            int m = fOpenMinor[i], pid = fOpenPid[i];
+            fOpenMinor[i] = 0; fOpenPid[i] = 0;
+            IOLockUnlock(fOpenLock);
+            if (m) xgResidentCall("xgDrmClose", (void *)(uintptr_t)m, (void *)(uintptr_t)pid, nullptr);
+        }
+    }
+    // name "dri/card%d" or "dri/renderD%d" -> DRM minor number, -1 otherwise
+    static int nodeId(const char *n) {
+        int id = 0; const char *p;
+        if (!strncmp(n, "dri/renderD", 11)) p = n + 11; else if (!strncmp(n, "dri/card", 8)) p = n + 8; else return -1;
+        if (!*p) return -1;
+        for (; *p; p++) { if (*p < '0' || *p > '9' || id > 100000) return -1; id = id * 10 + (*p - '0'); }
+        return id;
+    }
 public:
-    IOReturn clientClose() APPLE_KEXT_OVERRIDE { terminate(); return kIOReturnSuccess; }
+    bool initWithTask(task_t t, void *sid, UInt32 type) APPLE_KEXT_OVERRIDE {
+        if (!IOUserClient::initWithTask(t, sid, type)) return false;
+        fOpenLock = IOLockAlloc();
+        return fOpenLock != nullptr;
+    }
+    void free() APPLE_KEXT_OVERRIDE {
+        closeAll();
+        if (fOpenLock) { IOLockFree(fOpenLock); fOpenLock = nullptr; }
+        IOUserClient::free();
+    }
+    IOReturn clientClose() APPLE_KEXT_OVERRIDE { closeAll(); terminate(); return kIOReturnSuccess; }
     IOReturn externalMethod(uint32_t sel, IOExternalMethodArguments *a, IOExternalMethodDispatch *,
                             OSObject *, void *) APPLE_KEXT_OVERRIDE {
+        // selector 2 (kind 0 card / 1 render, DRM minor) -> (instance minor, errno)
+        if (sel == 2) {
+            if (a->scalarInputCount != 2 || a->scalarOutputCount != 2) return kIOReturnBadArgument;
+            uint64_t kind = a->scalarInput[0], id = a->scalarInput[1];
+            if (kind > 1 || id > 1023) return kIOReturnBadArgument;
+            char name[32];
+            snprintf(name, sizeof name, kind ? "dri/renderD%u" : "dri/card%u", (unsigned)id);
+            int minor = 0, err = xgResidentCall("xgDrmOpen", name, nullptr, &minor);
+            if (err == 0) {
+                int pid = proc_selfpid(); unsigned i;
+                IOLockLock(fOpenLock);
+                for (i = 0; i < kXgMaxOpen && fOpenMinor[i]; i++) {}
+                if (i < kXgMaxOpen) { fOpenMinor[i] = minor; fOpenPid[i] = pid; }
+                IOLockUnlock(fOpenLock);
+                if (i == kXgMaxOpen) { xgResidentCall("xgDrmClose", (void *)(uintptr_t)minor, (void *)(uintptr_t)pid, nullptr); err = EMFILE; minor = 0; }
+            }
+            static volatile SInt32 logged;
+            if (OSIncrementAtomic(&logged) < 40) ALOG("XGDR open %s for pid %d -> minor 0x%x errno %d", name, proc_selfpid(), minor, err);
+            a->scalarOutput[0] = (uint64_t)(uint32_t)minor; a->scalarOutput[1] = (uint64_t)err;
+            return kIOReturnSuccess;
+        }
+        // selector 3 (instance minor) -> errno; only an instance this connection opened
+        if (sel == 3) {
+            if (a->scalarInputCount != 1 || a->scalarOutputCount != 1) return kIOReturnBadArgument;
+            int m = (int)a->scalarInput[0], pid = 0;
+            IOLockLock(fOpenLock);
+            for (unsigned i = 0; m && i < kXgMaxOpen; i++)
+                if (fOpenMinor[i] == m) { pid = fOpenPid[i]; fOpenMinor[i] = 0; fOpenPid[i] = 0; break; }
+            IOLockUnlock(fOpenLock);
+            a->scalarOutput[0] = (uint64_t)(pid ? xgResidentCall("xgDrmClose", (void *)(uintptr_t)m, (void *)(uintptr_t)pid, nullptr) : EBADF);
+            return kIOReturnSuccess;
+        }
+        // selector 4 (index of a /dev/dri entry) -> (kind 0 card / 1 render / 2 other, DRM minor, node dev_t, errno):
+        // what readdir + stat of /dev/dri would have said; ENOENT past the last entry
+        if (sel == 4) {
+            if (a->scalarInputCount != 1 || a->scalarOutputCount != 4) return kIOReturnBadArgument;
+            char name[32] = {}; unsigned udev = 0;
+            int err = a->scalarInput[0] > 1024 ? ENOENT
+                    : xgResidentCall("xgDrmNode", (void *)(uintptr_t)a->scalarInput[0], name, &udev);
+            int id = err ? -1 : nodeId(name);
+            a->scalarOutput[0] = id < 0 ? 2 : !strncmp(name, "dri/renderD", 11);
+            a->scalarOutput[1] = (uint64_t)(id < 0 ? 0 : id);
+            a->scalarOutput[2] = udev; a->scalarOutput[3] = (uint64_t)err;
+            return kIOReturnSuccess;
+        }
         static IOService *res;
         // E16 (ArrowWhatever K9 idea, on NullMoth's own swap wait): selector 1 = WindowServer completion mark
         // (surface id, pending). NVIDIA sends it through NVK's surface escape; Intel has no NVK, so the plugin sends it

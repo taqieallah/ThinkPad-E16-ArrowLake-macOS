@@ -303,6 +303,55 @@ xg_fd_remote_ioctl(int minor, unsigned long cmd, unsigned long long uarg)
 	return (error);
 }
 
+/* E16: an open of a DRM node without its devfs vnode, for sandboxes that refuse /dev/dri (see xg_fd.h) */
+extern "C" int
+xg_fd_task_open(const char *name, int *minorp)
+{
+	int slot, inst, error;
+
+	if (name == NULL || minorp == NULL)
+		return (EINVAL);
+	if ((slot = xg_fd_node_slot(name, 0, NULL, 0)) < 0)
+		return (ENOENT);
+	if ((inst = xg_fd_inst_alloc(slot)) < 0)
+		return (ENFILE);
+	error = xg_fd_dev_open(inst, FREAD | FWRITE);
+	if (error != 0) {
+		/* only a reservation the open never took is still held; anything else the failed open gave back */
+		xg_fd_inst_free(inst);
+		return (xg_fd_errno(error));
+	}
+	*minorp = XG_FD_INST_MINOR(inst, slot);
+	return (0);
+}
+
+extern "C" int
+xg_fd_task_close(int minor, int pid)
+{
+	int inst = xg_fd_inst_of(xg_fd_makedev(0, minor));
+
+	if (inst < 0 || pid <= 0 || xg_fd_inst_owner(inst) != pid)
+		return (EBADF);
+	IOLockLock(xg_fd_sel_lock);
+	if (xg_fd_sels[inst].recorded)
+		selthreadclear((struct selinfo *)xg_fd_sels[inst].si);
+	bzero(&xg_fd_sels[inst], sizeof(xg_fd_sels[inst]));
+	IOLockUnlock(xg_fd_sel_lock);
+	return (xg_fd_errno(xg_fd_dev_close(inst)));
+}
+
+extern "C" int
+xg_fd_task_node(int idx, char *name, unsigned long len, unsigned int *udevp)
+{
+	int slot = xg_fd_node_slot(NULL, idx, name, len);
+
+	if (slot < 0)
+		return (ENOENT);
+	if (udevp != NULL)
+		*udevp = xg_fd_xnu_udev(slot);
+	return (0);
+}
+
 static int
 xg_fd_d_select(dev_t dev, int which, void *wql, struct proc *p)
 {
