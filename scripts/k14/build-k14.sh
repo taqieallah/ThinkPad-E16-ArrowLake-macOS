@@ -12,7 +12,7 @@ step "1/5 Rust (1.98 or newer, x86_64 target)"
 command -v rustup >/dev/null || { echo "STOP: rustup missing (brew install rustup && rustup-init -y)"; exit 1; }
 rustup toolchain install stable --profile minimal >> "$L" 2>&1
 rustup target add --toolchain stable x86_64-apple-darwin >> "$L" 2>&1
-echo "    $(rustc +stable --version)"
+echo "    $(rustup run stable rustc --version)"
 
 step "2/5 LLVM's llvm-as (assembles the self-test's AIR)"
 LLAS=""; for c in /opt/homebrew/opt/llvm/bin/llvm-as /opt/homebrew/opt/llvm@21/bin/llvm-as /opt/homebrew/opt/llvm@20/bin/llvm-as; do [ -x "$c" ] && { LLAS=$c; break; }; done
@@ -36,7 +36,7 @@ $LLAS "$D/am/shaders/scanout_convert.ll" -o "$P/air/scanout_convert.air"
 echo "    AIR $(stat -f %z "$P/air/runtime_examples.air") B"
 
 step "5/5 cargo build (x86_64-apple-darwin, release)"
-( cd "$P" && cargo +stable build --release --target x86_64-apple-darwin ) >> "$L" 2>&1 || { grep -E "^error" -A6 "$L" | head -40; echo "BUILD FAILED (log $L)"; exit 1; }
+( cd "$P" && rustup run stable cargo build --release --target x86_64-apple-darwin ) >> "$L" 2>&1 || { grep -E "^error|not found" -A6 "$L" | head -40; echo "BUILD FAILED (log $L)"; exit 1; }
 B=$P/target/x86_64-apple-darwin/release/xe-m2v-probe; lipo -archs "$B" | grep -q x86_64 || { echo "STOP: not x86_64"; exit 1; }
 cp "$B" "$HERE/xe-m2v-probe"; codesign -f -s - "$HERE/xe-m2v-probe" >> "$L" 2>&1
 echo "    xe-m2v-probe $(stat -f %z "$HERE/xe-m2v-probe") B"
