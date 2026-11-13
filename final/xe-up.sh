@@ -127,7 +127,7 @@ D=$LOGD/diag-$T.txt
 } > "$D" 2>&1; sync; W "diag snapshot -> $D ($(wc -l < "$D") lines)"
 W "$OK=$($S -n $OK) agdc_cmds=$($S -n debug.xegfx_agdc_cmds 2>/dev/null) client_set=$($S -n debug.xegfx_agdc_client_set 2>/dev/null)"
 sleep 10; kill $STREAM 2>/dev/null; sync
-# apps stop waiting for each command buffer (measured faster 2026-11-12, no glitches seen); 0 puts the wait back
-[ -f /Library/GPUBundles/nvmtl/xe-live ] || [ -d /Library/GPUBundles/nvmtl ] && echo "${XE_LIVE:-64}" > /Library/GPUBundles/nvmtl/xe-live
+# 1.0.1: apps wait for each command buffer again (xe-live 0). 64 (no wait) was on during both freezes of 2026-11-12/13; XE_LIVE=64 to test
+[ -f /Library/GPUBundles/nvmtl/xe-live ] || [ -d /Library/GPUBundles/nvmtl ] && echo "${XE_LIVE:-0}" > /Library/GPUBundles/nvmtl/xe-live
 W "xe-live $(cat /Library/GPUBundles/nvmtl/xe-live 2>/dev/null)  gt $($S -n debug.xegfx_gt_freq 2>/dev/null)"
 W "=== xe-up final 1.0 end ($MODE)"; rm -f /Library/LaunchDaemons/org.e16.xeup.plist
