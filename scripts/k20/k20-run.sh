@@ -1,5 +1,5 @@
 #!/bin/bash
-# On the laptop, after xe-up (the GPU must be up):   bash /Volumes/1401/xegfx-e16/k20/k20-run.sh [area ...]
+# On the laptop, after xe-up (the GPU must be up):   bash ~/Desktop/k20-laptop/k20-run.sh [area ...]
 # Runs reims-vgpu's host side on our ANV, driven by its own runner the way Apple's paravirtual GPU driver drives it in a
 # VM. Each scenario: OK (ran to its end), DIED (the host side crashed), HUNG (60 s), plus how its output compares with
 # what Apple's Metal produced on the reims developers' Mac. Results: k20/results/ and k20/summary.txt.
@@ -20,4 +20,4 @@ for a in $AREAS; do for f in "$HERE/scenarios/$a"/*.jsonl; do
   printf '%-60s %-10s %s\n' "$a/$s" "$st" "$cmpv" | tee -a "$S"
 done; done
 echo "== $n scenarios: OK $ok, DIED $died, HUNG $hung | same as Apple's Metal $same, differs $diff" | tee -a "$S"
-echo "(details in $R; please copy k20/summary.txt and k20/results to the Mac)"
+echo "(send the folder $HERE back to the Mac by AnyDesk: summary.txt and results/)"
