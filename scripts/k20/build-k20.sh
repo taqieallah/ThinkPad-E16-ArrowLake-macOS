@@ -28,7 +28,7 @@ O=$HOME/Desktop/k20-laptop; rm -rf "$O"; mkdir -p "$O/scenarios" "$O/expected"
 cp target/x86_64-apple-darwin/release/libreims_vgpu_c.dylib "$O/libreims_vgpu.dylib"; install_name_tool -id @rpath/libreims_vgpu.dylib "$O/libreims_vgpu.dylib"
 echo ">>> 4/4 pgrun (x86_64) + scenarios: $AREAS"
 clang -arch x86_64 -mmacosx-version-min=26.0 -fobjc-arc -O1 -g -Wno-deprecated-declarations -Wno-unguarded-availability-new \
-  -I crates/reims-vgpu-c/include "$O/libreims_vgpu.dylib" -Wl,-rpath,@executable_path -framework Foundation -framework Metal \
+  -I crates/reims-vgpu-c/include "$O/libreims_vgpu.dylib" -Wl,-rpath,@executable_path -Wl,-rpath,/usr/lib/swift -framework Foundation -framework Metal \
   tests/suite/runner/pgrun.m -o "$O/pgrun" >> "$L" 2>&1 || { tail -20 "$L"; echo "PGRUN BUILD FAILED"; exit 1; }
 codesign -f -s - "$O/libreims_vgpu.dylib" "$O/pgrun" >> "$L" 2>&1
 cp -R tests/suite/fixtures "$O/fixtures"

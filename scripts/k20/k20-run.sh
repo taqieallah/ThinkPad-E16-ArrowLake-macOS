@@ -4,7 +4,7 @@
 # VM. Each scenario: OK (ran to its end), DIED (the host side crashed), HUNG (60 s), plus how its output compares with
 # what Apple's Metal produced on the reims developers' Mac. Results: k20/results/ and k20/summary.txt.
 HERE=$(cd "$(dirname "$0")" && pwd); GB=/Library/GPUBundles/nvmtl; R=$HERE/results; mkdir -p "$R"; S=$HERE/summary.txt
-export VK_ICD_FILENAMES=$GB/intel_icd.json VK_DRIVER_FILES=$GB/intel_icd.json DYLD_FALLBACK_LIBRARY_PATH=$GB
+export VK_ICD_FILENAMES=$GB/intel_icd.json VK_DRIVER_FILES=$GB/intel_icd.json DYLD_FALLBACK_LIBRARY_PATH=/usr/lib/swift:$GB   # the library links Swift overlays by @rpath
 T=/tmp/k20; rm -rf "$T"; mkdir -p "$T"; cp "$HERE/pgrun" "$HERE/libreims_vgpu.dylib" "$T/"; chmod +x "$T/pgrun"
 ln -sf "$GB/libvulkan.dylib" "$T/libvulkan.dylib"; ln -sf "$GB/libvulkan.dylib" "$T/libvulkan.1.dylib"
 AREAS=${*:-$(ls "$HERE/scenarios")}
