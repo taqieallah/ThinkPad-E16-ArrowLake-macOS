@@ -6,7 +6,8 @@
 [ "$(id -u)" = 0 ] && { echo "run it without sudo (sudo drops the library paths)"; exit 1; }
 HERE=$(cd "$(dirname "$0")" && pwd); GB=/Library/GPUBundles/nvmtl; R=$HERE/results; mkdir -p "$R"; S=$HERE/summary.txt
 export VK_ICD_FILENAMES=$GB/intel_icd.json VK_DRIVER_FILES=$GB/intel_icd.json DYLD_FALLBACK_LIBRARY_PATH=/usr/lib/swift:$GB   # the library links Swift overlays by @rpath
-T=/tmp/k20; rm -rf "$T"; mkdir -p "$T"; cp "$HERE/pgrun" "$HERE/libreims_vgpu.dylib" "$T/"; chmod +x "$T/pgrun"
+T=$(mktemp -d "${TMPDIR:-/tmp}/k20.XXXXXX");   # a fresh folder each run (an old /tmp/k20 may belong to root)
+ cp "$HERE/pgrun" "$HERE/libreims_vgpu.dylib" "$T/"; chmod +x "$T/pgrun"
 ln -sf "$GB/libvulkan.dylib" "$T/libvulkan.dylib"; ln -sf "$GB/libvulkan.dylib" "$T/libvulkan.1.dylib"
 AREAS=${*:-$(ls "$HERE/scenarios")}
 ok=0; died=0; hung=0; same=0; diff=0; n=0
