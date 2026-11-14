@@ -21,6 +21,12 @@ TC=$(dirname "$(rustup which rustc)"); export PATH=$TC:$PATH RUSTC=$TC/rustc; ec
 # tools, so it takes the metallibs the repo commits for Linux builds (the same files, checked by their sha256 record)
 sed -i '' 's/if !cfg!(target_os = "macos") {/if true { \/\/ k20: committed metallibs (no Xcode Metal toolchain)/' crates/reims-vgpu-vulkan/build.rs
 grep -q "k20: committed metallibs" crates/reims-vgpu-vulkan/build.rs || { echo "STOP: build.rs patch did not apply"; exit 1; }
+# reims's test suite is written for 16 KiB guest pages (arm64 guests); an x86_64 build uses 4 KiB (an x86 guest), so
+# every guest address of the suite missed (mapMemory refused, no stamp ever came). This TEST build takes 16 KiB pages,
+# as macos_gg_qemu's RVG_GUEST_PAGE_SHIFT=14 does; the real K20 (an x86 macOS guest) keeps 4 KiB.
+P=crates/reims-vgpu-core/src/guest/records.rs
+sed -i '' 's/^pub const APV_PAGE_SHIFT: u32 = if cfg!(target_arch = "x86_64") { 12 } else { 14 };/pub const APV_PAGE_SHIFT: u32 = 14; \/\/ k20 test build: the suite'"'"'s 16 KiB guest pages/' $P
+grep -q "k20 test build" $P || { echo "STOP: page-size patch did not apply"; exit 1; }
 echo ">>> 3/4 libreims_vgpu.dylib (Vulkan platform, x86_64, no SDL) - several minutes"
 # flat namespace: the SDK's x86_64 tbds bind some CoreMedia constants to libswiftCoreMedia, which on the laptop does
 # not export them (dyld: Symbol not found _kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms); flat
