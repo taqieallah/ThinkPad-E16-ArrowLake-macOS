@@ -22,7 +22,10 @@ TC=$(dirname "$(rustup which rustc)"); export PATH=$TC:$PATH RUSTC=$TC/rustc; ec
 sed -i '' 's/if !cfg!(target_os = "macos") {/if true { \/\/ k20: committed metallibs (no Xcode Metal toolchain)/' crates/reims-vgpu-vulkan/build.rs
 grep -q "k20: committed metallibs" crates/reims-vgpu-vulkan/build.rs || { echo "STOP: build.rs patch did not apply"; exit 1; }
 echo ">>> 3/4 libreims_vgpu.dylib (Vulkan platform, x86_64, no SDL) - several minutes"
-"$TC/cargo" build --release -p reims-vgpu-c --lib --no-default-features --features vulkan --target x86_64-apple-darwin >> "$L" 2>&1 \
+# flat namespace: the SDK's x86_64 tbds bind some CoreMedia constants to libswiftCoreMedia, which on the laptop does
+# not export them (dyld: Symbol not found _kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms); flat
+# lookup finds them in CoreMedia itself
+"$TC/cargo" rustc --release -p reims-vgpu-c --lib --crate-type cdylib --no-default-features --features vulkan --target x86_64-apple-darwin -- -C link-arg=-Wl,-flat_namespace >> "$L" 2>&1 \
   || { grep -E "^error" -A8 "$L" | head -40; echo "BUILD FAILED (log $L)"; exit 1; }
 O=$HOME/Desktop/k20-laptop; rm -rf "$O"; mkdir -p "$O/scenarios" "$O/expected"
 cp target/x86_64-apple-darwin/release/libreims_vgpu_c.dylib "$O/libreims_vgpu.dylib"; install_name_tool -id @rpath/libreims_vgpu.dylib "$O/libreims_vgpu.dylib"
