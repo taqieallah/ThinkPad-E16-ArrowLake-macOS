@@ -17,6 +17,10 @@ echo ">>> 2/4 Rust (the repo pins its toolchain) + x86_64 target"
 rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal >> "$L" 2>&1
 rustup target add x86_64-apple-darwin >> "$L" 2>&1
 TC=$(dirname "$(rustup which rustc)"); export PATH=$TC:$PATH RUSTC=$TC/rustc; echo "    $("$TC/rustc" --version)"
+# the Vulkan crate compiles its Metal shaders with Xcode's Metal toolchain on a Mac; this Mac has only the command-line
+# tools, so it takes the metallibs the repo commits for Linux builds (the same files, checked by their sha256 record)
+sed -i '' 's/if !cfg!(target_os = "macos") {/if true { \/\/ k20: committed metallibs (no Xcode Metal toolchain)/' crates/reims-vgpu-vulkan/build.rs
+grep -q "k20: committed metallibs" crates/reims-vgpu-vulkan/build.rs || { echo "STOP: build.rs patch did not apply"; exit 1; }
 echo ">>> 3/4 libreims_vgpu.dylib (Vulkan platform, x86_64, no SDL) - several minutes"
 "$TC/cargo" build --release -p reims-vgpu-c --lib --no-default-features --features vulkan --target x86_64-apple-darwin >> "$L" 2>&1 \
   || { grep -E "^error" -A8 "$L" | head -40; echo "BUILD FAILED (log $L)"; exit 1; }
