@@ -25,7 +25,7 @@ echo ">>> 3/4 libreims_vgpu.dylib (Vulkan platform, x86_64, no SDL) - several mi
 "$TC/cargo" build --release -p reims-vgpu-c --lib --no-default-features --features vulkan --target x86_64-apple-darwin >> "$L" 2>&1 \
   || { grep -E "^error" -A8 "$L" | head -40; echo "BUILD FAILED (log $L)"; exit 1; }
 O=$HOME/Desktop/k20-laptop; rm -rf "$O"; mkdir -p "$O/scenarios" "$O/expected"
-cp target/x86_64-apple-darwin/release/libreims_vgpu.dylib "$O/"; install_name_tool -id @rpath/libreims_vgpu.dylib "$O/libreims_vgpu.dylib"
+cp target/x86_64-apple-darwin/release/libreims_vgpu_c.dylib "$O/libreims_vgpu.dylib"; install_name_tool -id @rpath/libreims_vgpu.dylib "$O/libreims_vgpu.dylib"
 echo ">>> 4/4 pgrun (x86_64) + scenarios: $AREAS"
 clang -arch x86_64 -mmacosx-version-min=26.0 -fobjc-arc -O1 -g -Wno-deprecated-declarations -Wno-unguarded-availability-new \
   -I crates/reims-vgpu-c/include "$O/libreims_vgpu.dylib" -Wl,-rpath,@executable_path -framework Foundation -framework Metal \
