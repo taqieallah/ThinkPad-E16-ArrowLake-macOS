@@ -1,0 +1,467 @@
+# ALLOWED-SYMBOLS.txt - symbols the planned E16 Reims PCI kext may import
+# target: macOS 26.7.1 (25G241), x86_64 ThinkPad E16
+# source: /Volumes/1401/xegfx-e16/diag-25G241/{Boot,System}KernelExtensions.kc (the
+#         same System collection as /Volumes/1401/k21-dump, sha256 c29d75f...)
+# method: nm -um on the probe kexts in kexts/  +  tools/classify.py (links the
+#         import to the export owner with linkcheck's N_EXT/N_SECT rule)
+#
+# A symbol is importable when the kext lists its owning bundle in OSBundleLibraries.
+# com.apple.kernel symbols are covered by the com.apple.kpi.* entries.
+# Kernel code is the Boot collection (kernel + IOPCIFamily + boot kexts); the
+# System collection only holds the post-boot system kexts.
+#
+# columns: symbol <TAB> exported-by <TAB> OSBundleLibraries entry <TAB> category
+
+
+## IOBufferMemoryDescriptor (kernel)
+__ZN24IOBufferMemoryDescriptor17inTaskWithOptionsEP4taskjmm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZTV24IOBufferMemoryDescriptor	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOCommandGate (kernel)
+__ZN13IOCommandGate11commandGateEP8OSObjectPFiS1_PvS2_S2_S2_E	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IODeviceMemory (kernel)
+__ZN14IODeviceMemory9withRangeEyy	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOEventSource (kernel)
+__ZTV13IOEventSource	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOInterruptEventSource (kernel)
+__ZN22IOInterruptEventSource20interruptEventSourceEP8OSObjectPFvS1_PS_iEP9IOServicei	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOLocks/clock/IOMalloc (kernel)
+_IOFreeContiguous	com.apple.kernel	com.apple.kpi.* (kernel)
+_IOLockAlloc	com.apple.kernel	com.apple.kpi.* (kernel)
+_IOLockFree	com.apple.kernel	com.apple.kpi.* (kernel)
+_IOLockLock	com.apple.kernel	com.apple.kpi.* (kernel)
+_IOLockSleepDeadline_darwin14	com.apple.kernel	com.apple.kpi.* (kernel)
+_IOLockUnlock	com.apple.kernel	com.apple.kpi.* (kernel)
+_IOLockWakeup_darwin14	com.apple.kernel	com.apple.kpi.* (kernel)
+_IOMallocContiguous	com.apple.kernel	com.apple.kpi.* (kernel)
+_clock_interval_to_deadline	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOMemoryDescriptor (kernel)
+__ZN18IOMemoryDescriptor19createMappingInTaskEP4taskyjyy	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN18IOMemoryDescriptor19withPhysicalAddressEyyj	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOPCIDevice (IOPCIFamily)
+__ZN11IOPCIDevice10gMetaClassE	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice10handleOpenEP9IOServicejPv	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice11configRead8E17IOPCIAddressSpaceh	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice11detachAboveEPK15IORegistryPlane	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice11handleCloseEP9IOServicej	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice11setIOEnableEbb	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice12configRead16E17IOPCIAddressSpaceh	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice12configRead32E17IOPCIAddressSpaceh	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice12configWrite8E17IOPCIAddressSpacehh	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice12getBusNumberEv	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice12getResourcesEv	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice12requestProbeEj	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice13configWrite16E17IOPCIAddressSpaceht	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice13configWrite32E17IOPCIAddressSpacehj	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice13matchLocationEP9IOService	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice13newUserClientEP4taskPvjP12OSDictionaryPP12IOUserClient	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice13setConfigBitsEhjj	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice13setPowerStateEmP9IOService	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice13setPropertiesEP8OSObject	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice14ioDeviceMemoryEv	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice15getDeviceNumberEv	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice15saveDeviceStateEj	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice15setMemoryEnableEb	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice17findPCICapabilityEhPh	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice17getFunctionNumberEv	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice18matchPropertyTableEP12OSDictionary	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice18matchPropertyTableEP12OSDictionaryPi	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice18restoreDeviceStateEj	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice18setBusMasterEnableEb	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice20callPlatformFunctionEPK8OSSymbolbPvS3_S3_S3_	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice20callPlatformFunctionEPKcbPvS2_S2_S2_	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice3Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice4Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice5Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice6Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice7Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice8Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice9Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice21hasPCIPowerManagementEj	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice10Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice11Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice12Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice13Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice14Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice15Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice16Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice17Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice18Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice19Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice20Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice21Ev	-	(kxld parent-vtable fill)
+__ZN11IOPCIDevice22powerStateWillChangeToEmmP9IOService	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice24enablePCIPowerManagementEj	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice24powerStateForDomainStateEm	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice25extendedFindPCICapabilityEjPy	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice27maxCapabilityForDomainStateEm	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice31initialPowerStateForDomainStateEm	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice4initEP12OSDictionary	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice4initEP15IORegistryEntryPK15IORegistryPlane	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice6attachEP9IOService	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice6detachEP9IOService	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice7ioRead8EtP11IOMemoryMap	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice8DispatchE5IORPC	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice8ioRead16EtP11IOMemoryMap	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice8ioRead32EtP11IOMemoryMap	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice8ioWrite8EthP11IOMemoryMap	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice9ioWrite16EttP11IOMemoryMap	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice9ioWrite32EtjP11IOMemoryMap	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDevice9metaClassE	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDeviceC2EPK11OSMetaClass	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZN11IOPCIDeviceD2Ev	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZNK11IOPCIDevice11compareNameEP8OSStringPS1_	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+__ZTV11IOPCIDevice	com.apple.iokit.IOPCIFamily	com.apple.iokit.IOPCIFamily
+
+## IORegistryEntry (kernel)
+__ZN15IORegistryEntry11detachAboveEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setLocationEPK8OSSymbolPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setLocationEPKcPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setPropertyEPK8OSStringP8OSObject	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setPropertyEPK8OSSymbolP8OSObject	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setPropertyEPKcP8OSObject	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setPropertyEPKcPvj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setPropertyEPKcS1_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setPropertyEPKcb	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry11setPropertyEPKcyj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry13attachToChildEPS_PK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry13childFromPathEPKcPK15IORegistryPlanePcPi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry13setPropertiesEP8OSObject	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry14attachToParentEPS_PK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry14removePropertyEPK8OSString	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry14removePropertyEPK8OSSymbol	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry14removePropertyEPKc	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry15detachFromChildEPS_PK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry16detachFromParentEPS_PK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry16setPropertyTableEP12OSDictionary	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry17runPropertyActionEPFiP8OSObjectPvS2_S2_S2_ES1_S2_S2_S2_S2_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry0Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry1Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry3Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry4Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry5Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry6Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry7Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry8Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry25_RESERVEDIORegistryEntry9Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry10Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry11Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry12Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry13Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry14Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry15Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry16Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry17Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry18Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry19Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry20Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry21Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry22Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry23Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry24Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry25Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry26Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry27Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry28Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry29Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry30Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry26_RESERVEDIORegistryEntry31Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry7setNameEPK8OSSymbolPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry7setNameEPKcPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15IORegistryEntry9detachAllEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11compareNameEP8OSStringPS1_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11getLocationEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11getPropertyEPK8OSString	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11getPropertyEPK8OSStringPK15IORegistryPlanej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11getPropertyEPK8OSSymbol	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11getPropertyEPK8OSSymbolPK15IORegistryPlanej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11getPropertyEPKc	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry11getPropertyEPKcPK15IORegistryPlanej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12compareNamesEP8OSObjectPP8OSString	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12copyLocationEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12copyPropertyEPK8OSString	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12copyPropertyEPK8OSStringPK15IORegistryPlanej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12copyPropertyEPK8OSSymbol	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12copyPropertyEPK8OSSymbolPK15IORegistryPlanej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12copyPropertyEPKc	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry12copyPropertyEPKcPK15IORegistryPlanej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry13getChildEntryEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry14applyToParentsEPFvPS_PvES1_PK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry14copyChildEntryEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry14getParentEntryEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry15applyToChildrenEPFvPS_PvES1_PK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry15copyParentEntryEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry16getChildIteratorEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry16getPathComponentEPcPiPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry17getParentIteratorEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry24dictionaryWithPropertiesEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry7getNameEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry7getPathEPcPiPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry7inPlaneEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry7isChildEPS_PK15IORegistryPlaneb	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry8copyNameEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry8getDepthEPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15IORegistryEntry8isParentEPS_PK15IORegistryPlaneb	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOService (kernel)
+__ZN9IOService10adjustBusyEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService10gMetaClassE	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService10handleOpenEPS_jPv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService10joinPMtreeEPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService11handleCloseEPS_j	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService12didTerminateEPS_jPb	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService12getBusyStateEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService12getResourcesEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService12requestProbeEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService12tellChangeUpEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService12updateReportEP19IOReportChannelListjPvS2_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13addPowerChildEPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13askChangeDownEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13matchLocationEPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13messageClientEjP8OSObjectPvm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13setPowerStateEmPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13willTerminateEPS_j	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService14activityTickleEmm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService14applyToClientsEPFvPS_PvES1_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService14causeInterruptEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService14messageClientsEjPvm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService14tellChangeDownEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15comparePropertyEP12OSDictionaryPK8OSString	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15comparePropertyEP12OSDictionaryPKc	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15configureReportEP19IOReportChannelListjPvS2_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15enableInterruptEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15errnoFromReturnEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15getDeviceMemoryEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15nextIdleTimeoutEyyj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15powerChangeDoneEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15registerServiceEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15setDeviceMemoryEP7OSArray	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService15terminateClientEPS_j	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16allowPowerChangeEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16applyToProvidersEPFvPS_PvES1_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16disableInterruptEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16getInterruptTypeEiPi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16registerInterestEPK8OSSymbolPFiPvS3_jPS_S3_mES3_S3_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16removePowerChildEP17IOPowerConnection	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16requestTerminateEPS_j	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16stringFromReturnEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService16tellNoChangeDownEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService17addNeededResourceEPKc	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService17applyToInterestedEPK8OSSymbolPFvP8OSObjectPvES5_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService17cancelPowerChangeEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService17comparePropertiesEP12OSDictionaryP12OSCollection	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService17getAggressivenessEmPm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService17registerInterruptEiP8OSObjectPFvS1_PvPS_iES2_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService17setAggressivenessEmm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService18lockForArbitrationEb	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService18matchPropertyTableEP12OSDictionary	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService18matchPropertyTableEP12OSDictionaryPi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService18setIdleTimerPeriodEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService18systemWillShutdownEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService3Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService4Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService5Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService6Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService7Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService8Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19_RESERVEDIOService9Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19registerPowerDriverEPS_P14IOPMPowerStatem	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService19unregisterInterruptEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService10Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService11Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService12Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService13Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService14Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService15Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService16Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService17Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService18Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService19Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService20Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService21Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService22Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService23Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService24Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService25Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService26Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService27Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService28Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService29Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService30Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService31Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService32Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService33Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService34Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService35Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService36Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService37Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService38Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService39Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService40Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService41Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService42Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService43Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService44Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService45Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService46Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20_RESERVEDIOService47Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20callPlatformFunctionEPK8OSSymbolbPvS3_S3_S3_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20callPlatformFunctionEPKcbPvS2_S2_S2_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20getDeviceMemoryCountEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService20unlockForArbitrationEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService21powerStateDidChangeToEmmPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService22copyClientWithCategoryEPK8OSSymbol	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService22powerStateWillChangeToEmmPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService23acknowledgeNotificationEPvj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService23requestPowerDomainStateEmP17IOPowerConnectionm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService24getDeviceMemoryWithIndexEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService24mapDeviceMemoryWithIndexEjj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService24powerStateForDomainStateEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService27maxCapabilityForDomainStateEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService31initialPowerStateForDomainStateEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService4initEP12OSDictionary	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService4initEP15IORegistryEntryPK15IORegistryPlane	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService4openEPS_jPv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService4stopEPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService5closeEPS_j	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService5probeEPS_Pi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService6PMinitEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService6PMstopEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService6attachEPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService6detachEPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService7messageEjPS_Pv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService8DispatchE5IORPC	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService8finalizeEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService9terminateEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOServiceC2EPK11OSMetaClass	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOServiceD2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService11getProviderEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService11getWorkLoopEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService12handleIsOpenEPKS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService17getClientIteratorEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService19getProviderIteratorEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService19serializePropertiesEP11OSSerialize	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService21getOpenClientIteratorEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService23getOpenProviderIteratorEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService6isOpenEPKS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService8getStateEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK9IOService9getClientEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZTV9IOService	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## IOUserClient (kernel)
+__ZN12IOUserClient10clientDiedEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient10gMetaClassE	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient10getServiceEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient11clientCloseEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient12initWithTaskEP4taskPvj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient13connectClientEPS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient14externalMethodEjP25IOExternalMethodArgumentsP24IOExternalMethodDispatchP8OSObjectPv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient18clientHasPrivilegeEPvPKc	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient20exportObjectToClientEP4taskP8OSObjectPS3_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient0Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient1Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient3Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient4Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient5Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient6Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient7Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient8Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient22_RESERVEDIOUserClient9Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient23_RESERVEDIOUserClient10Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient23_RESERVEDIOUserClient11Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient23_RESERVEDIOUserClient12Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient23_RESERVEDIOUserClient13Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient23_RESERVEDIOUserClient14Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient23_RESERVEDIOUserClient15Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient23getExternalTrapForIndexEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient24getNotificationSemaphoreEjPP9semaphore	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient24getTargetAndTrapForIndexEPP9IOServicej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient24registerNotificationPortEP8ipc_portjj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient24registerNotificationPortEP8ipc_portjy	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient25getExternalMethodForIndexEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient26getTargetAndMethodForIndexEPP9IOServicej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient30getExternalAsyncMethodForIndexEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient31getAsyncTargetAndMethodForIndexEPP9IOServicej	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient4initEP12OSDictionary	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient4initEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClient8DispatchE5IORPC	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClientC2EPK11OSMetaClass	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN12IOUserClientD2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13newUserClientEP4taskPvjP12OSDictionaryPP12IOUserClient	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN9IOService13newUserClientEP4taskPvjPP12IOUserClient	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZTV12IOUserClient	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## OSKext (kernel)
+__ZN6OSKext24lookupKextWithIdentifierEP8OSString	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN6OSKext24lookupKextWithIdentifierEPKc	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## OSObject/OSMetaClass/libkern (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass0Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass1Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass3Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass4Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass5Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass6Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClass21_RESERVEDOSMetaClass7Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClassC2EPKcPKS_j	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN11OSMetaClassD2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15OSMetaClassBase12safeMetaCastEPKS_PK11OSMetaClass	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15OSMetaClassBase25_RESERVEDOSMetaClassBase4Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15OSMetaClassBase25_RESERVEDOSMetaClassBase5Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15OSMetaClassBase25_RESERVEDOSMetaClassBase6Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15OSMetaClassBase25_RESERVEDOSMetaClassBase7Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN15OSMetaClassBase8DispatchE5IORPC	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN7OSArray12withCapacityEj	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject0Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject1Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject2Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject3Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject4Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject5Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject6Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject7Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject8Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject18_RESERVEDOSObject9Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject19_RESERVEDOSObject10Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject19_RESERVEDOSObject11Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject19_RESERVEDOSObject12Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject19_RESERVEDOSObject13Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject19_RESERVEDOSObject14Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject19_RESERVEDOSObject15Ev	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObject4initEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObjectdlEPvm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZN8OSObjectnwEm	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass12getMetaClassEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass12taggedRetainEPKv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass13taggedReleaseEPKv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass13taggedReleaseEPKvi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass14getRetainCountEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass19instanceConstructedEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass6retainEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass7releaseEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass7releaseEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK11OSMetaClass9serializeEP11OSSerialize	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK15OSMetaClassBase9isEqualToEPKS_	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject12taggedRetainEPKv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject13taggedReleaseEPKv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject13taggedReleaseEPKvi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject14getRetainCountEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject6retainEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject7releaseEi	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject7releaseEv	com.apple.kernel	com.apple.kpi.* (kernel)
+__ZNK8OSObject9serializeEP11OSSerialize	com.apple.kernel	com.apple.kpi.* (kernel)
+
+## libc/bzero and kernel globals
+_kernel_task	com.apple.kernel	com.apple.kpi.* (kernel)
+
+# 423 unique symbols from 4 probe kexts; all are exported by the named bundle

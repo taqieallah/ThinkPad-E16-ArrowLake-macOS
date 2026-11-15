@@ -94,3 +94,22 @@ XeGfx. Details: `docs/ARCMTL-EXPERIMENT.md`.
 - **الخطوة الجاية:** تشغيل `sudo bash /Volumes/1401/xegfx-e16/cpu-apply.sh` وريستارت، وبعدين `powermetrics` وانت بتسكرول. الهدف إن الكور المشغول يبقى فوق 3000 ميجاهرتز.
 - **بعدها:** بناء النواة الجديدة عشان نقيس سرعة كارت الشاشة (`debug.xegfx_gt_freq`) ونجرّب نثبّتها على الأقصى.
 - **ArcMTL:** متوقف دلوقتي، ومتطفّي من الـ boot-args.
+
+---
+
+## AppleParavirtGPU/Reims bridge (2026-11-15, experimental)
+
+A separate experiment lives in `apple-paravirt/`: Apple's real `AppleParavirtGPU` (25G241) driving
+Reims on the Arc 140T, with a patched XeGfxAccel taking the resulting frames to the panel.
+
+- **Built and offline-verified:** kext `ReimsPCIProbe` 0.3.2 (7 patched BAR0 sites, shared BAR0 page,
+  IRQ0, guest page export, synchronous transport), `apv-host` (single-owner Reims session + panel
+  pipeline), patched `XeGfxAccel` (selector 5: INFO/ACQUIRE/PRESENT/RELEASE; zero new undefined
+  symbols). Details in `apple-paravirt/VERIFICATION.md`.
+- **Live state:** two E16 boots ended in a **full system freeze** (run 1: full patch+display; run 2:
+  `apvpatch=0` with no kernel patching, so the freeze is *not* the text patch). Userspace logs are
+  lost on the hard reset; keep a `log stream` window open when continuing.
+- **Next:** `apple-paravirt/FREEZE-ANALYSIS.md` has the run log and the isolation plan
+  (`--no-publish` then `--no-guest-writes`), plus the exact log lines needed from run 2.
+- The XeGfx side is untouched: the panel patch is opt-in and has `--undo`; the daily system stays as
+  it was without it.

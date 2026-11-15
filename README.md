@@ -22,6 +22,7 @@ NullMoth's Metal plugin and translator, Mesa ANV) with the E16 changes in this r
 | Wi-Fi (Intel BE201 `8086:7740`) | Working after the macOS update (AirportItlwm build) |
 | Sleep / external displays | Not done (the driver does not own the display engine) |
 | ArcMTL experiment | ArcXe runs commands and 3D on this GPU; desktop black, parked (see docs) |
+| AppleParavirtGPU + Reims bridge | **experimental**: built and offline-verified; two live boots froze — see `apple-paravirt/FREEZE-ANALYSIS.md` |
 
 ## What is in here
 
@@ -46,6 +47,7 @@ No Apple binaries, firmware, kernel collections or SMBIOS data are included.
 - [docs/BUILD-AND-INSTALL.md](docs/BUILD-AND-INSTALL.md): building on an Apple Silicon Mac, installing on the laptop
 - [docs/PERFORMANCE.md](docs/PERFORMANCE.md): refresh rate, copy path, zero-copy flip, K9b, numbers
 - [docs/ARCMTL-EXPERIMENT.md](docs/ARCMTL-EXPERIMENT.md): the ArcMTL route, what passed, what hangs
+- [apple-paravirt/README.md](apple-paravirt/README.md): the AppleParavirtGPU (Reims) bridge experiment, and its freeze analysis
 - [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): problems hit along the way and their fixes
 
 ## Credits

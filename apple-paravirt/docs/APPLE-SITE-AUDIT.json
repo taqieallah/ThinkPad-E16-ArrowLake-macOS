@@ -1,0 +1,1789 @@
+{
+  "schema": "apv-mmio-site-audit/1",
+  "image": {
+    "path": "/Users/taqieallah/Documents/deepseek-harness/default-workspace/e16-work/apv/com.apple.driver.AppleParavirtGPU",
+    "uuid": "0CAE9E29-BC33-315D-82A7-A7D30E9B971E",
+    "arch": "x86_64",
+    "text_vmaddr": 344555520,
+    "text_fileoff": 0,
+    "text_filesize": 98304,
+    "text_section_va": 344557056,
+    "text_section_file_offset": 1536,
+    "text_section_size": 77672
+  },
+  "mapping": {
+    "pci_bar": "BAR0 (IOPCIDevice::mapDeviceMemoryWithRegister(0x10,0))",
+    "map_vtable_slot": "0x908",
+    "map_getva_vtable_slot": "0x118",
+    "register_base_delta": 4096,
+    "rule": "register_base = map->getVirtualAddress() + 0x1000; BAR0 register offset = instruction displacement + 0x1000",
+    "struct_fields": [
+      {
+        "class_name": "AppleParavirtGPUControl",
+        "iomemorymap_field": 352,
+        "register_base_field": 360,
+        "setup_function": "__ZN23AppleParavirtGPUControl9setupMMIOEv",
+        "setup_va": 344559460
+      },
+      {
+        "class_name": "AppleParavirtAccelerator",
+        "iomemorymap_field": 3616,
+        "register_base_field": 3624,
+        "setup_function": "__ZN24AppleParavirtAccelerator9setupMMIOEv",
+        "setup_va": 344566790
+      },
+      {
+        "class_name": "AppleParavirtFramebuffer",
+        "iomemorymap_field": 672,
+        "register_base_field": 680,
+        "setup_function": "__ZN24AppleParavirtFramebuffer9setupMMIOEv",
+        "setup_va": 344577538
+      }
+    ]
+  },
+  "coverage": {
+    "method": "whole-__text abstract interpretation (see taint.py): class/offset-tagged flow for the three register-base fields, register copies, lea/add address arithmetic, stack spills, branch merge, interprocedural argument check",
+    "instructions_scanned": 20936,
+    "functions_scanned": 850,
+    "bar0_mapping_sites": "exactly one mapDeviceMemoryWithRegister(0x10,0) call per class (IOPCIDevice vtable slot 0x908) and exactly one getVirtualAddress()+0x1000 per class",
+    "additional_bar0_sites_found": 0,
+    "note": "No BAR0 access exists outside the 19 prior entries. The only correction is that __TEXT+0x2f67 is not a BAR0 access at all."
+  },
+  "prior_list_verdicts": [
+    {
+      "index": 0,
+      "file_offset": 4266,
+      "listed_bytes": "44 8b 88 2c 02 00 00",
+      "decoded": [
+        "movl\t0x22c(%rax), %r9d"
+      ],
+      "decoded_bytes": "44 8b 88 2c 02 00 00",
+      "bytes_match": true,
+      "annotated_role": "display port count (BAR0+0x122c)",
+      "bar0_offset_claimed": 4652,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 1,
+      "file_offset": 10232,
+      "listed_bytes": "89 41 1c",
+      "decoded": [
+        "movl\t%eax, 0x1c(%rcx)"
+      ],
+      "decoded_bytes": "89 41 1c",
+      "bytes_match": true,
+      "annotated_role": "root PFN (BAR0+0x101c)",
+      "bar0_offset_claimed": 4124,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 2,
+      "file_offset": 10920,
+      "listed_bytes": "89 41 30",
+      "decoded": [
+        "movl\t%eax, 0x30(%rcx)"
+      ],
+      "decoded_bytes": "89 41 30",
+      "bytes_match": true,
+      "annotated_role": "FIFO PFN (BAR0+0x1030)",
+      "bar0_offset_claimed": 4144,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 3,
+      "file_offset": 10946,
+      "listed_bytes": "89 41 04",
+      "decoded": [
+        "movl\t%eax, 0x4(%rcx)"
+      ],
+      "decoded_bytes": "89 41 04",
+      "bytes_match": true,
+      "annotated_role": "FIFO length (BAR0+0x1004)",
+      "bar0_offset_claimed": 4100,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 4,
+      "file_offset": 10949,
+      "listed_bytes": "c7 41 10 00 10 00 00",
+      "decoded": [
+        "movl\t$0x1000, 0x10(%rcx)"
+      ],
+      "decoded_bytes": "c7 41 10 00 10 00 00",
+      "bytes_match": true,
+      "annotated_role": "FIFO start (BAR0+0x1010)",
+      "bar0_offset_claimed": 4112,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 5,
+      "file_offset": 10956,
+      "listed_bytes": "c7 01 01 00 00 00",
+      "decoded": [
+        "movl\t$0x1, (%rcx)"
+      ],
+      "decoded_bytes": "c7 01 01 00 00 00",
+      "bytes_match": true,
+      "annotated_role": "FIFO enable (BAR0+0x1000)",
+      "bar0_offset_claimed": 4096,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 6,
+      "file_offset": 11140,
+      "listed_bytes": "8b 71 0c",
+      "decoded": [
+        "movl\t0xc(%rcx), %esi"
+      ],
+      "decoded_bytes": "8b 71 0c",
+      "bytes_match": true,
+      "annotated_role": "FIFO cursor poll (BAR0+0x100c)",
+      "bar0_offset_claimed": 4108,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 7,
+      "file_offset": 11248,
+      "listed_bytes": "89 58 08",
+      "decoded": [
+        "movl\t%ebx, 0x8(%rax)"
+      ],
+      "decoded_bytes": "89 58 08",
+      "bytes_match": true,
+      "annotated_role": "FIFO doorbell (BAR0+0x1008)",
+      "bar0_offset_claimed": 4104,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 8,
+      "file_offset": 11484,
+      "listed_bytes": "89 4a 34 44 8b 62 34",
+      "decoded": [
+        "movl\t%ecx, 0x34(%rdx)",
+        "movl\t0x34(%rdx), %r12d"
+      ],
+      "decoded_bytes": "89 4a 34 44 8b 62 34",
+      "bytes_match": true,
+      "annotated_role": "version write and read (BAR0+0x1034)",
+      "bar0_offset_claimed": 4148,
+      "verdict": "correct",
+      "note": "bytes decode to 2 instructions (write then read)"
+    },
+    {
+      "index": 9,
+      "file_offset": 11760,
+      "listed_bytes": "c7 42 34 06 00 00 80",
+      "decoded": [
+        "movl\t$0x80000006, 0x34(%rdx)"
+      ],
+      "decoded_bytes": "c7 42 34 06 00 00 80",
+      "bytes_match": true,
+      "annotated_role": "version fallback write (BAR0+0x1034)",
+      "bar0_offset_claimed": 4148,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 10,
+      "file_offset": 11999,
+      "listed_bytes": "44 8b 70 18",
+      "decoded": [
+        "movl\t0x18(%rax), %r14d"
+      ],
+      "decoded_bytes": "44 8b 70 18",
+      "bytes_match": true,
+      "annotated_role": "stamp flags (BAR0+0x1018)",
+      "bar0_offset_claimed": 4120,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 11,
+      "file_offset": 12038,
+      "listed_bytes": "8b 70 14",
+      "decoded": [
+        "movl\t0x14(%rax), %esi"
+      ],
+      "decoded_bytes": "8b 70 14",
+      "bytes_match": true,
+      "annotated_role": "display flags (BAR0+0x1014)",
+      "bar0_offset_claimed": 4116,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 12,
+      "file_offset": 12064,
+      "listed_bytes": "83 78 2c 00",
+      "decoded": [
+        "cmpl\t$0x0, 0x2c(%rax)"
+      ],
+      "decoded_bytes": "83 78 2c 00",
+      "bytes_match": true,
+      "annotated_role": "fault comparison (BAR0+0x102c)",
+      "bar0_offset_claimed": 4140,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 13,
+      "file_offset": 12135,
+      "listed_bytes": "ff 90 e0 08 00 00",
+      "decoded": [
+        "callq\t*0x8e0(%rax)"
+      ],
+      "decoded_bytes": "ff 90 e0 08 00 00",
+      "bytes_match": true,
+      "annotated_role": "PCI capability query (capability 5)",
+      "bar0_offset_claimed": null,
+      "verdict": "miscategorized",
+      "note": "not a BAR0 access: vtable call on IOPCIDevice (capability 5 = MSI)"
+    },
+    {
+      "index": 14,
+      "file_offset": 12318,
+      "listed_bytes": "c7 00 00 00 00 00",
+      "decoded": [
+        "movl\t$0x0, (%rax)"
+      ],
+      "decoded_bytes": "c7 00 00 00 00 00",
+      "bytes_match": true,
+      "annotated_role": "FIFO disable on teardown (BAR0+0x1000)",
+      "bar0_offset_claimed": 4096,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 15,
+      "file_offset": 21516,
+      "listed_bytes": "c7 80 00 02 00 00 00 00 00 00",
+      "decoded": [
+        "movl\t$0x0, 0x200(%rax)"
+      ],
+      "decoded_bytes": "c7 80 00 02 00 00 00 00 00 00",
+      "bytes_match": true,
+      "annotated_role": "framebuffer startup write (BAR0+0x1200)",
+      "bar0_offset_claimed": 4608,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 16,
+      "file_offset": 52320,
+      "listed_bytes": "89 88 20 02 00 00",
+      "decoded": [
+        "movl\t%ecx, 0x220(%rax)"
+      ],
+      "decoded_bytes": "89 88 20 02 00 00",
+      "bytes_match": true,
+      "annotated_role": "display doorbell (BAR0+0x1220)",
+      "bar0_offset_claimed": 4640,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 17,
+      "file_offset": 73625,
+      "listed_bytes": "89 48 20",
+      "decoded": [
+        "movl\t%ecx, 0x20(%rax)"
+      ],
+      "decoded_bytes": "89 48 20",
+      "bytes_match": true,
+      "annotated_role": "child FIFO wake (BAR0+0x1020)",
+      "bar0_offset_claimed": 4128,
+      "verdict": "correct",
+      "note": ""
+    },
+    {
+      "index": 18,
+      "file_offset": 73750,
+      "listed_bytes": "89 48 28",
+      "decoded": [
+        "movl\t%ecx, 0x28(%rax)"
+      ],
+      "decoded_bytes": "89 48 28",
+      "bytes_match": true,
+      "annotated_role": "child FIFO resume (BAR0+0x1028)",
+      "bar0_offset_claimed": 4136,
+      "verdict": "correct",
+      "note": ""
+    }
+  ],
+  "mmio_pointer_loads": [
+    {
+      "file_offset": 4259,
+      "va": 344559779,
+      "bytes": "49 8b 86 68 01 00 00",
+      "instruction": "movq\t0x168(%r14), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 360,
+      "owner_class": "AppleParavirtGPUControl",
+      "based_on": "%r14",
+      "function": {
+        "mangled": "__ZN23AppleParavirtGPUControl5startEP9IOService",
+        "demangled": "AppleParavirtGPUControl::start(IOService*)",
+        "va": 344559662,
+        "file_offset": 4142
+      }
+    },
+    {
+      "file_offset": 10225,
+      "va": 344565745,
+      "bytes": "48 8b 8b 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rbx), %rcx",
+      "bar0_register_base_dest": "%rcx",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupRootEv",
+        "demangled": "AppleParavirtAccelerator::setupRoot()",
+        "va": 344565392,
+        "file_offset": 9872
+      }
+    },
+    {
+      "file_offset": 10913,
+      "va": 344566433,
+      "bytes": "48 8b 8b 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rbx), %rcx",
+      "bar0_register_base_dest": "%rcx",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupFIFOEv",
+        "demangled": "AppleParavirtAccelerator::setupFIFO()",
+        "va": 344566122,
+        "file_offset": 10602
+      }
+    },
+    {
+      "file_offset": 10939,
+      "va": 344566459,
+      "bytes": "48 8b 8b 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rbx), %rcx",
+      "bar0_register_base_dest": "%rcx",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupFIFOEv",
+        "demangled": "AppleParavirtAccelerator::setupFIFO()",
+        "va": 344566122,
+        "file_offset": 10602
+      }
+    },
+    {
+      "file_offset": 11121,
+      "va": 344566641,
+      "bytes": "49 8b 8e 28 0e 00 00",
+      "instruction": "movq\t0xe28(%r14), %rcx",
+      "bar0_register_base_dest": "%rcx",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%r14",
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9writeFifoEjPKv",
+        "demangled": "AppleParavirtAccelerator::writeFifo(unsigned int, void const*)",
+        "va": 344566540,
+        "file_offset": 11020
+      }
+    },
+    {
+      "file_offset": 11241,
+      "va": 344566761,
+      "bytes": "49 8b 86 28 0e 00 00",
+      "instruction": "movq\t0xe28(%r14), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%r14",
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9writeFifoEjPKv",
+        "demangled": "AppleParavirtAccelerator::writeFifo(unsigned int, void const*)",
+        "va": 344566540,
+        "file_offset": 11020
+      }
+    },
+    {
+      "file_offset": 11417,
+      "va": 344566937,
+      "bytes": "48 8b 97 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rdi), %rdx",
+      "bar0_register_base_dest": "%rdx",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rdi",
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator12setupVersionEv",
+        "demangled": "AppleParavirtAccelerator::setupVersion()",
+        "va": 344566920,
+        "file_offset": 11400
+      }
+    },
+    {
+      "file_offset": 11992,
+      "va": 344567512,
+      "bytes": "48 8b 83 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rbx), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "____ZN24AppleParavirtAccelerator15setupInterruptsEv_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtAccelerator::setupInterrupts()",
+        "va": 344567501,
+        "file_offset": 11981
+      }
+    },
+    {
+      "file_offset": 12031,
+      "va": 344567551,
+      "bytes": "48 8b 83 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rbx), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "____ZN24AppleParavirtAccelerator15setupInterruptsEv_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtAccelerator::setupInterrupts()",
+        "va": 344567501,
+        "file_offset": 11981
+      }
+    },
+    {
+      "file_offset": 12057,
+      "va": 344567577,
+      "bytes": "48 8b 83 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rbx), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "____ZN24AppleParavirtAccelerator15setupInterruptsEv_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtAccelerator::setupInterrupts()",
+        "va": 344567501,
+        "file_offset": 11981
+      }
+    },
+    {
+      "file_offset": 12311,
+      "va": 344567831,
+      "bytes": "48 8b 83 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rbx), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator14teardownDeviceEP11IOPCIDevice",
+        "demangled": "AppleParavirtAccelerator::teardownDevice(IOPCIDevice*)",
+        "va": 344567792,
+        "file_offset": 12272
+      }
+    },
+    {
+      "file_offset": 21509,
+      "va": 344577029,
+      "bytes": "48 8b 83 a8 02 00 00",
+      "instruction": "movq\t0x2a8(%rbx), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 680,
+      "owner_class": "AppleParavirtFramebuffer",
+      "based_on": "%rbx",
+      "function": {
+        "mangled": "__ZN24AppleParavirtFramebuffer5startEP9IOService",
+        "demangled": "AppleParavirtFramebuffer::start(IOService*)",
+        "va": 344576980,
+        "file_offset": 21460
+      }
+    },
+    {
+      "file_offset": 52313,
+      "va": 344607833,
+      "bytes": "48 8b 80 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rax), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rax",
+      "function": {
+        "mangled": "____ZN24AppleParavirtDisplayPipe17updateCursorStateEttb_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtDisplayPipe::updateCursorState(unsigned short, unsigned short, bool)",
+        "va": 344607668,
+        "file_offset": 52148
+      }
+    },
+    {
+      "file_offset": 73618,
+      "va": 344629138,
+      "bytes": "48 8b 80 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rax), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rax",
+      "function": {
+        "mangled": "__ZN27AppleParavirtVirtualChannel12submitBufferEP24IOAccelCommandDescriptor",
+        "demangled": "AppleParavirtVirtualChannel::submitBuffer(IOAccelCommandDescriptor*)",
+        "va": 344628822,
+        "file_offset": 73302
+      }
+    },
+    {
+      "file_offset": 73743,
+      "va": 344629263,
+      "bytes": "48 8b 80 28 0e 00 00",
+      "instruction": "movq\t0xe28(%rax), %rax",
+      "bar0_register_base_dest": "%rax",
+      "pointer_field_offset": 3624,
+      "owner_class": "AppleParavirtAccelerator",
+      "based_on": "%rax",
+      "function": {
+        "mangled": "__ZN27AppleParavirtVirtualChannel22resetHardwareAndReplayEv",
+        "demangled": "AppleParavirtVirtualChannel::resetHardwareAndReplay()",
+        "va": 344629168,
+        "file_offset": 73648
+      }
+    }
+  ],
+  "sites": [
+    {
+      "id": "S01",
+      "file_offset": 4266,
+      "va": 344559786,
+      "bytes": "44 8b 88 2c 02 00 00",
+      "instruction": "movl\t0x22c(%rax), %r9d",
+      "width": 4,
+      "kind": "read",
+      "bar0_offset": 4652,
+      "value_location": "%r9d",
+      "base_register": "%rax",
+      "instruction_length_bytes": 7,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 4273,
+      "next_instruction_va": 344559793,
+      "function": {
+        "mangled": "__ZN23AppleParavirtGPUControl5startEP9IOService",
+        "demangled": "AppleParavirtGPUControl::start(IOService*)",
+        "va": 344559662,
+        "file_offset": 4142
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtGPUControl",
+        "pointer_field_offset": 360,
+        "pointer_load_file_offset": 4259
+      },
+      "prior_list": {
+        "index": 0,
+        "offset": 4266,
+        "annotation": "display port count (BAR0+0x122c)",
+        "expected_bytes": "44 8b 88 2c 02 00 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "device_computed_value"
+      ],
+      "rationale": "Device-provided display topology register (number of display ports). The driver never writes BAR0+0x122c, so a shadow-RAM read would return 0 and Control::start would silently fall back to 1 port. Value must come from the host side at read time.",
+      "patch": {
+        "span_start_file_offset": 4266,
+        "span_start_va": 344559786,
+        "span_length": 7,
+        "span_bytes": "44 8b 88 2c 02 00 00",
+        "replacement": "e8 xx xx xx xx 66 90",
+        "original_instructions": [
+          {
+            "file_offset": 4266,
+            "va": 344559786,
+            "bytes": "44 8b 88 2c 02 00 00",
+            "instruction": "movl\t0x22c(%rax), %r9d"
+          }
+        ],
+        "next_after_span_file_offset": 4273,
+        "entry_registers": {
+          "bar0_register_base": "%rax",
+          "this": "%r14"
+        },
+        "output_registers": [
+          "%r9d"
+        ],
+        "flags_live_after_span": false,
+        "stub_operation": "%r9d = apv_mmio_read(%rax, 0x122c, 4)",
+        "notes": "Single 7-byte instruction; call(5)+2-byte nop.",
+        "live_after_span_conservative": [
+          "r14",
+          "r8",
+          "r9",
+          "rbx",
+          "rcx",
+          "rdx"
+        ],
+        "entry_live_conservative": [
+          "r14",
+          "r8",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx"
+        ]
+      }
+    },
+    {
+      "id": "S02",
+      "file_offset": 10232,
+      "va": 344565752,
+      "bytes": "89 41 1c",
+      "instruction": "movl\t%eax, 0x1c(%rcx)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4124,
+      "value_location": "%eax (source)",
+      "base_register": "%rcx",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 10235,
+      "next_instruction_va": 344565755,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupRootEv",
+        "demangled": "AppleParavirtAccelerator::setupRoot()",
+        "va": 344565392,
+        "file_offset": 9872
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 10225
+      },
+      "prior_list": {
+        "index": 1,
+        "offset": 10232,
+        "annotation": "root PFN (BAR0+0x101c)",
+        "expected_bytes": "89 41 1c",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "Root page-table PFN computed by the guest from its own descriptor; plain store into the shared BAR0 page is authoritative.",
+      "patch": null
+    },
+    {
+      "id": "S03",
+      "file_offset": 10920,
+      "va": 344566440,
+      "bytes": "89 41 30",
+      "instruction": "movl\t%eax, 0x30(%rcx)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4144,
+      "value_location": "%eax (source)",
+      "base_register": "%rcx",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 10923,
+      "next_instruction_va": 344566443,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupFIFOEv",
+        "demangled": "AppleParavirtAccelerator::setupFIFO()",
+        "va": 344566122,
+        "file_offset": 10602
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 10913
+      },
+      "prior_list": {
+        "index": 2,
+        "offset": 10920,
+        "annotation": "FIFO PFN (BAR0+0x1030)",
+        "expected_bytes": "89 41 30",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "FIFO PFN computed by the guest from its own IOMemoryDescriptor; plain store.",
+      "patch": null
+    },
+    {
+      "id": "S04",
+      "file_offset": 10946,
+      "va": 344566466,
+      "bytes": "89 41 04",
+      "instruction": "movl\t%eax, 0x4(%rcx)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4100,
+      "value_location": "%eax (source)",
+      "base_register": "%rcx",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 10949,
+      "next_instruction_va": 344566469,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupFIFOEv",
+        "demangled": "AppleParavirtAccelerator::setupFIFO()",
+        "va": 344566122,
+        "file_offset": 10602
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 10939
+      },
+      "prior_list": {
+        "index": 3,
+        "offset": 10946,
+        "annotation": "FIFO length (BAR0+0x1004)",
+        "expected_bytes": "89 41 04",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "FIFO length taken from the guest descriptor via IOMemoryDescriptor vtable; plain store.",
+      "patch": null
+    },
+    {
+      "id": "S05",
+      "file_offset": 10949,
+      "va": 344566469,
+      "bytes": "c7 41 10 00 10 00 00",
+      "instruction": "movl\t$0x1000, 0x10(%rcx)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4112,
+      "value_location": "immediate 0x1000",
+      "base_register": "%rcx",
+      "instruction_length_bytes": 7,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 10956,
+      "next_instruction_va": 344566476,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupFIFOEv",
+        "demangled": "AppleParavirtAccelerator::setupFIFO()",
+        "va": 344566122,
+        "file_offset": 10602
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 10939
+      },
+      "prior_list": {
+        "index": 4,
+        "offset": 10949,
+        "annotation": "FIFO start (BAR0+0x1010)",
+        "expected_bytes": "c7 41 10 00 10 00 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "Constant FIFO start offset 0x1000; plain store.",
+      "patch": null
+    },
+    {
+      "id": "S06",
+      "file_offset": 10956,
+      "va": 344566476,
+      "bytes": "c7 01 01 00 00 00",
+      "instruction": "movl\t$0x1, (%rcx)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4096,
+      "value_location": "immediate 0x1",
+      "base_register": "%rcx",
+      "instruction_length_bytes": 6,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 10962,
+      "next_instruction_va": 344566482,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9setupFIFOEv",
+        "demangled": "AppleParavirtAccelerator::setupFIFO()",
+        "va": 344566122,
+        "file_offset": 10602
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 10939
+      },
+      "prior_list": {
+        "index": 5,
+        "offset": 10956,
+        "annotation": "FIFO enable (BAR0+0x1000)",
+        "expected_bytes": "c7 01 01 00 00 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "FIFO enable bit. Plain store is enough: x86 TSO preserves the store order of PFN/length/start/enable into the shared page and the daemon applies them in polling order.",
+      "patch": null
+    },
+    {
+      "id": "S07",
+      "file_offset": 11140,
+      "va": 344566660,
+      "bytes": "8b 71 0c",
+      "instruction": "movl\t0xc(%rcx), %esi",
+      "width": 4,
+      "kind": "read",
+      "bar0_offset": 4108,
+      "value_location": "%esi (destination)",
+      "base_register": "%rcx",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 11143,
+      "next_instruction_va": 344566663,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9writeFifoEjPKv",
+        "demangled": "AppleParavirtAccelerator::writeFifo(unsigned int, void const*)",
+        "va": 344566540,
+        "file_offset": 11020
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 11121
+      },
+      "prior_list": {
+        "index": 6,
+        "offset": 11140,
+        "annotation": "FIFO cursor poll (BAR0+0x100c)",
+        "expected_bytes": "8b 71 0c",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "device_computed_value",
+        "polled_in_loop"
+      ],
+      "rationale": "FIFO write cursor updated by the device as it consumes commands. writeFifo() polls it in a loop to find free space; a shadow-RAM copy is stale and can make the loop spin or overwrite unconsumed commands.",
+      "patch": {
+        "span_start_file_offset": 11140,
+        "span_start_va": 344566660,
+        "span_length": 5,
+        "span_bytes": "8b 71 0c 01 d6",
+        "replacement": "e8 xx xx xx xx",
+        "original_instructions": [
+          {
+            "file_offset": 11140,
+            "va": 344566660,
+            "bytes": "8b 71 0c",
+            "instruction": "movl\t0xc(%rcx), %esi"
+          },
+          {
+            "file_offset": 11143,
+            "va": 344566663,
+            "bytes": "01 d6",
+            "instruction": "addl\t%edx, %esi"
+          }
+        ],
+        "next_after_span_file_offset": 11145,
+        "entry_registers": {
+          "bar0_register_base": "%rcx",
+          "addend": "%edx",
+          "this": "%r14"
+        },
+        "output_registers": [
+          "%esi"
+        ],
+        "flags_live_after_span": false,
+        "stub_operation": "%esi = apv_mmio_read(%rcx, 0x100c, 4) + %edx   (reproduces the addl inside the span)",
+        "notes": "Loop head: the site is the branch target of jb at __TEXT+0x2b8b; every iteration must re-dispatch (live cursor).",
+        "live_after_span_conservative": [
+          "r12",
+          "r14",
+          "r15",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx",
+          "rsi"
+        ],
+        "entry_live_conservative": [
+          "r12",
+          "r14",
+          "r15",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx"
+        ]
+      }
+    },
+    {
+      "id": "S08",
+      "file_offset": 11248,
+      "va": 344566768,
+      "bytes": "89 58 08",
+      "instruction": "movl\t%ebx, 0x8(%rax)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4104,
+      "value_location": "%ebx (source)",
+      "base_register": "%rax",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 11251,
+      "next_instruction_va": 344566771,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator9writeFifoEjPKv",
+        "demangled": "AppleParavirtAccelerator::writeFifo(unsigned int, void const*)",
+        "va": 344566540,
+        "file_offset": 11020
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 11241
+      },
+      "prior_list": {
+        "index": 7,
+        "offset": 11248,
+        "annotation": "FIFO doorbell (BAR0+0x1008)",
+        "expected_bytes": "89 58 08",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "FIFO doorbell / write index. Stores into shared RAM are ordered after the FIFO data stores; the daemon polls the doorbell and applies it.",
+      "patch": null
+    },
+    {
+      "id": "S09",
+      "file_offset": 11484,
+      "va": 344567004,
+      "bytes": "89 4a 34",
+      "instruction": "movl\t%ecx, 0x34(%rdx)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4148,
+      "value_location": "%ecx (source)",
+      "base_register": "%rdx",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 11487,
+      "next_instruction_va": 344567007,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator12setupVersionEv",
+        "demangled": "AppleParavirtAccelerator::setupVersion()",
+        "va": 344566920,
+        "file_offset": 11400
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 11417
+      },
+      "prior_list": {
+        "index": 8,
+        "offset": 11484,
+        "annotation": "version write and read (BAR0+0x1034)",
+        "expected_bytes": "89 4a 34 44 8b 62 34",
+        "bytes_match": false,
+        "note": ""
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "device_computed_value",
+        "write_then_read_ordering"
+      ],
+      "rationale": "First half of the version-negotiation handshake: the written request is immediately read back (0x2cdf) and the read-back value drives the retry loop. The write and read must be one atomic dispatch (versionPair) so the device sees the request before the reply is sampled.",
+      "patch": {
+        "span_start_file_offset": 11484,
+        "span_start_va": 344567004,
+        "span_length": 7,
+        "span_bytes": "89 4a 34 44 8b 62 34",
+        "replacement": "e8 xx xx xx xx 66 90",
+        "original_instructions": [
+          {
+            "file_offset": 11484,
+            "va": 344567004,
+            "bytes": "89 4a 34",
+            "instruction": "movl\t%ecx, 0x34(%rdx)"
+          },
+          {
+            "file_offset": 11487,
+            "va": 344567007,
+            "bytes": "44 8b 62 34",
+            "instruction": "movl\t0x34(%rdx), %r12d"
+          }
+        ],
+        "next_after_span_file_offset": 11491,
+        "entry_registers": {
+          "bar0_register_base": "%rdx",
+          "version_value_to_write": "%ecx",
+          "this": "%rdi"
+        },
+        "output_registers": [
+          "%r12d"
+        ],
+        "flags_live_after_span": false,
+        "stub_operation": "%r12d = apv_mmio_version_pair(%rdx, 0x1034, %ecx)   (write then read on one dispatch)",
+        "notes": "Span covers BOTH the 3-byte write and the 4-byte read-back (2cdc/2cdf).",
+        "live_after_span_conservative": [
+          "r10",
+          "r11",
+          "r12",
+          "r13",
+          "r14",
+          "r15",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rdi",
+          "rdx",
+          "rsi"
+        ],
+        "entry_live_conservative": [
+          "r10",
+          "r11",
+          "r13",
+          "r14",
+          "r15",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdi",
+          "rdx",
+          "rsi"
+        ]
+      }
+    },
+    {
+      "id": "S10",
+      "file_offset": 11487,
+      "va": 344567007,
+      "bytes": "44 8b 62 34",
+      "instruction": "movl\t0x34(%rdx), %r12d",
+      "width": 4,
+      "kind": "read",
+      "bar0_offset": 4148,
+      "value_location": "%r12d (destination)",
+      "base_register": "%rdx",
+      "instruction_length_bytes": 4,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 11491,
+      "next_instruction_va": 344567011,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator12setupVersionEv",
+        "demangled": "AppleParavirtAccelerator::setupVersion()",
+        "va": 344566920,
+        "file_offset": 11400
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 11417
+      },
+      "prior_list": {
+        "index": 8,
+        "offset": 11484,
+        "annotation": "version write and read (BAR0+0x1034)",
+        "expected_bytes": "89 4a 34 44 8b 62 34",
+        "bytes_match": true,
+        "note": "second instruction of the 0x2CDC record (record spans 7 bytes / two instructions)"
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "device_computed_value",
+        "write_then_read_ordering"
+      ],
+      "rationale": "Second half of the version-negotiation handshake; read-back value is device-negotiated. Covered by the same 7-byte patch span that starts at __TEXT+0x2cdc.",
+      "patch": {
+        "span_start_file_offset": 11484,
+        "span_start_va": 344567004,
+        "span_length": 7,
+        "span_bytes": "89 4a 34 44 8b 62 34",
+        "replacement": "e8 xx xx xx xx 66 90",
+        "original_instructions": [
+          {
+            "file_offset": 11484,
+            "va": 344567004,
+            "bytes": "89 4a 34",
+            "instruction": "movl\t%ecx, 0x34(%rdx)"
+          },
+          {
+            "file_offset": 11487,
+            "va": 344567007,
+            "bytes": "44 8b 62 34",
+            "instruction": "movl\t0x34(%rdx), %r12d"
+          }
+        ],
+        "next_after_span_file_offset": 11491,
+        "entry_registers": {
+          "bar0_register_base": "%rdx",
+          "version_value_to_write": "%ecx",
+          "this": "%rdi"
+        },
+        "output_registers": [
+          "%r12d"
+        ],
+        "flags_live_after_span": false,
+        "stub_operation": "%r12d = apv_mmio_version_pair(%rdx, 0x1034, %ecx)   (write then read on one dispatch)",
+        "covered_by_site": "S09",
+        "live_after_span_conservative": [
+          "r10",
+          "r11",
+          "r12",
+          "r13",
+          "r14",
+          "r15",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rdi",
+          "rdx",
+          "rsi"
+        ],
+        "entry_live_conservative": [
+          "r10",
+          "r11",
+          "r13",
+          "r14",
+          "r15",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdi",
+          "rdx",
+          "rsi"
+        ],
+        "notes": "covered by the same 7-byte versionPair span anchored at __TEXT+0x2cdc"
+      }
+    },
+    {
+      "id": "S11",
+      "file_offset": 11760,
+      "va": 344567280,
+      "bytes": "c7 42 34 06 00 00 80",
+      "instruction": "movl\t$0x80000006, 0x34(%rdx)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4148,
+      "value_location": "immediate 0x80000006",
+      "base_register": "%rdx",
+      "instruction_length_bytes": 7,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 11767,
+      "next_instruction_va": 344567287,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator12setupVersionEv",
+        "demangled": "AppleParavirtAccelerator::setupVersion()",
+        "va": 344566920,
+        "file_offset": 11400
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 11417
+      },
+      "prior_list": {
+        "index": 9,
+        "offset": 11760,
+        "annotation": "version fallback write (BAR0+0x1034)",
+        "expected_bytes": "c7 42 34 06 00 00 80",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "Fallback version force-write after negotiation gives up. It is a pure write with no read-back, so a plain store is fine for memory semantics. NOTE: if the bridge must fail closed when the daemon is unreachable, this site must be dispatched instead (it is the only place that can report a transport failure back to configureDevice).",
+      "patch": null
+    },
+    {
+      "id": "S12",
+      "file_offset": 11999,
+      "va": 344567519,
+      "bytes": "44 8b 70 18",
+      "instruction": "movl\t0x18(%rax), %r14d",
+      "width": 4,
+      "kind": "read",
+      "bar0_offset": 4120,
+      "value_location": "%r14d (destination)",
+      "base_register": "%rax",
+      "instruction_length_bytes": 4,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 12003,
+      "next_instruction_va": 344567523,
+      "function": {
+        "mangled": "____ZN24AppleParavirtAccelerator15setupInterruptsEv_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtAccelerator::setupInterrupts()",
+        "va": 344567501,
+        "file_offset": 11981
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 11992
+      },
+      "prior_list": {
+        "index": 10,
+        "offset": 11999,
+        "annotation": "stamp flags (BAR0+0x1018)",
+        "expected_bytes": "44 8b 70 18",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "device_computed_value",
+        "read_to_clear"
+      ],
+      "rationale": "Stamp-pending flags written by the device and consumed by the interrupt action block (value passed to AppleParavirtEventMachine::signalStamps). Read-to-clear semantics must be performed on the device side.",
+      "patch": {
+        "span_start_file_offset": 11999,
+        "span_start_va": 344567519,
+        "span_length": 7,
+        "span_bytes": "44 8b 70 18 45 85 f6",
+        "replacement": "e8 xx xx xx xx 66 90",
+        "original_instructions": [
+          {
+            "file_offset": 11999,
+            "va": 344567519,
+            "bytes": "44 8b 70 18",
+            "instruction": "movl\t0x18(%rax), %r14d"
+          },
+          {
+            "file_offset": 12003,
+            "va": 344567523,
+            "bytes": "45 85 f6",
+            "instruction": "testl\t%r14d, %r14d"
+          }
+        ],
+        "next_after_span_file_offset": 12006,
+        "entry_registers": {
+          "bar0_register_base": "%rax",
+          "this": "%rbx"
+        },
+        "output_registers": [
+          "%r14d",
+          "flags"
+        ],
+        "flags_live_after_span": true,
+        "stub_operation": "%r14d = apv_mmio_read(%rax, 0x1018, 4); testl %r14d, %r14d",
+        "notes": "Span includes the following testl so ZF/CF/OF/SF/PF must equal testl of the value (je at __TEXT+0x2ee6 consumes them).",
+        "live_after_span_conservative": [
+          "flags",
+          "r14",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx",
+          "rsi"
+        ],
+        "entry_live_conservative": [
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx",
+          "rsi"
+        ]
+      }
+    },
+    {
+      "id": "S13",
+      "file_offset": 12038,
+      "va": 344567558,
+      "bytes": "8b 70 14",
+      "instruction": "movl\t0x14(%rax), %esi",
+      "width": 4,
+      "kind": "read",
+      "bar0_offset": 4116,
+      "value_location": "%esi (destination)",
+      "base_register": "%rax",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 12041,
+      "next_instruction_va": 344567561,
+      "function": {
+        "mangled": "____ZN24AppleParavirtAccelerator15setupInterruptsEv_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtAccelerator::setupInterrupts()",
+        "va": 344567501,
+        "file_offset": 11981
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 12031
+      },
+      "prior_list": {
+        "index": 11,
+        "offset": 12038,
+        "annotation": "display flags (BAR0+0x1014)",
+        "expected_bytes": "8b 70 14",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "device_computed_value",
+        "read_to_clear"
+      ],
+      "rationale": "Display-pending flags written by the device and consumed by the interrupt action block (value passed to AppleParavirtDisplayMachine::signalDisplays). Read-to-clear semantics must be performed on the device side.",
+      "patch": {
+        "span_start_file_offset": 12038,
+        "span_start_va": 344567558,
+        "span_length": 5,
+        "span_bytes": "8b 70 14 85 f6",
+        "replacement": "e8 xx xx xx xx",
+        "original_instructions": [
+          {
+            "file_offset": 12038,
+            "va": 344567558,
+            "bytes": "8b 70 14",
+            "instruction": "movl\t0x14(%rax), %esi"
+          },
+          {
+            "file_offset": 12041,
+            "va": 344567561,
+            "bytes": "85 f6",
+            "instruction": "testl\t%esi, %esi"
+          }
+        ],
+        "next_after_span_file_offset": 12043,
+        "entry_registers": {
+          "bar0_register_base": "%rax",
+          "this": "%rbx"
+        },
+        "output_registers": [
+          "%esi",
+          "flags"
+        ],
+        "flags_live_after_span": true,
+        "stub_operation": "%esi = apv_mmio_read(%rax, 0x1014, 4); testl %esi, %esi",
+        "notes": "Span includes the following testl so flags must equal testl of the value (je at __TEXT+0x2f0b consumes them).",
+        "live_after_span_conservative": [
+          "flags",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx",
+          "rsi"
+        ],
+        "entry_live_conservative": [
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx"
+        ]
+      }
+    },
+    {
+      "id": "S14",
+      "file_offset": 12064,
+      "va": 344567584,
+      "bytes": "83 78 2c 00",
+      "instruction": "cmpl\t$0x0, 0x2c(%rax)",
+      "width": 4,
+      "kind": "cmp",
+      "bar0_offset": 4140,
+      "value_location": "memory [BAR0+0x102c] compared with $0x0",
+      "base_register": "%rax",
+      "instruction_length_bytes": 4,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 12068,
+      "next_instruction_va": 344567588,
+      "function": {
+        "mangled": "____ZN24AppleParavirtAccelerator15setupInterruptsEv_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtAccelerator::setupInterrupts()",
+        "va": 344567501,
+        "file_offset": 11981
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 12057
+      },
+      "prior_list": {
+        "index": 12,
+        "offset": 12064,
+        "annotation": "fault comparison (BAR0+0x102c)",
+        "expected_bytes": "83 78 2c 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "device_computed_value",
+        "read_to_clear"
+      ],
+      "rationale": "Fault status latched by the device; non-zero diverts the interrupt action block into AppleParavirtAccelerator::handleFaultInterrupt(). A shadow-RAM copy would always read 0 and GPU faults would never be recovered. The surrounding branch must be reproduced by the stub.",
+      "patch": {
+        "span_start_file_offset": 12064,
+        "span_start_va": 344567584,
+        "span_length": 6,
+        "span_bytes": "83 78 2c 00 74 0c",
+        "replacement": "e8 xx xx xx xx 90",
+        "original_instructions": [
+          {
+            "file_offset": 12064,
+            "va": 344567584,
+            "bytes": "83 78 2c 00",
+            "instruction": "cmpl\t$0x0, 0x2c(%rax)"
+          },
+          {
+            "file_offset": 12068,
+            "va": 344567588,
+            "bytes": "74 0c",
+            "instruction": "je\t0x1489af32 <____ZN24AppleParavirtAccelerator15setupInterruptsEv_block_invoke+0x65>"
+          }
+        ],
+        "next_after_span_file_offset": 12070,
+        "entry_registers": {
+          "bar0_register_base": "%rax",
+          "this": "%rbx"
+        },
+        "output_registers": [],
+        "flags_live_after_span": false,
+        "stub_operation": "if (apv_mmio_read(%rax, 0x102c, 4) != 0) goto __TEXT+0x2f26 else goto __TEXT+0x2f32",
+        "notes": "Span covers the compare AND the 2-byte conditional branch je. The stub must discard the return address pushed by the patched call and transfer control to one of the two original destinations (tail-jump): __TEXT+0x2f26 (fault present, falls into handleFaultInterrupt) or __TEXT+0x2f32 (no fault).",
+        "live_after_span_conservative": [
+          "rbx"
+        ],
+        "entry_live_conservative": [
+          "rax",
+          "rbx"
+        ]
+      }
+    },
+    {
+      "id": "S15",
+      "file_offset": 12135,
+      "va": 344567655,
+      "bytes": "ff 90 e0 08 00 00",
+      "instruction": "callq\t*0x8e0(%rax)",
+      "width": null,
+      "kind": "not_bar0",
+      "value_location": "n/a",
+      "base_register": "%rax (IOPCIDevice vtable pointer, NOT a BAR pointer)",
+      "instruction_length_bytes": 6,
+      "rip_relative": false,
+      "uses_non_bar_base_register": true,
+      "next_instruction_file_offset": 12141,
+      "next_instruction_va": 344567661,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator15configureDeviceEP11IOPCIDevice",
+        "demangled": "AppleParavirtAccelerator::configureDevice(IOPCIDevice*)",
+        "va": 344567608,
+        "file_offset": 12088
+      },
+      "mmio_struct": {
+        "object_class": "IOPCIDevice",
+        "pointer_field_offset": null,
+        "pointer_load_file_offset": null
+      },
+      "prior_list": {
+        "index": 13,
+        "offset": 12135,
+        "annotation": "PCI capability query (capability 5)",
+        "expected_bytes": "ff 90 e0 08 00 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "do_not_patch",
+      "classification_factors": [
+        "not_a_bar0_access"
+      ],
+      "rationale": "callq *0x8e0(%rax) where %rax is the IOPCIDevice vtable loaded from 0xdd8(%rbx). This is the vtable slot for the PCI capability lookup (argument %esi=5, i.e. MSI capability). It is NOT a BAR0 access and must not be patched.",
+      "patch": null
+    },
+    {
+      "id": "S16",
+      "file_offset": 12318,
+      "va": 344567838,
+      "bytes": "c7 00 00 00 00 00",
+      "instruction": "movl\t$0x0, (%rax)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4096,
+      "value_location": "immediate 0x0",
+      "base_register": "%rax",
+      "instruction_length_bytes": 6,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 12324,
+      "next_instruction_va": 344567844,
+      "function": {
+        "mangled": "__ZN24AppleParavirtAccelerator14teardownDeviceEP11IOPCIDevice",
+        "demangled": "AppleParavirtAccelerator::teardownDevice(IOPCIDevice*)",
+        "va": 344567792,
+        "file_offset": 12272
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtAccelerator",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 12311
+      },
+      "prior_list": {
+        "index": 14,
+        "offset": 12318,
+        "annotation": "FIFO disable on teardown (BAR0+0x1000)",
+        "expected_bytes": "c7 00 00 00 00 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "patch_required",
+      "classification_factors": [
+        "ordering_with_teardown"
+      ],
+      "rationale": "FIFO disable on teardown. Ordering is load-bearing: the very next actions release the FIFO IOMemoryDescriptor/map and the BAR mapping, so the daemon must have applied (and acknowledged) the disable before teardown frees the pages. A plain RAM store gives no completion guarantee.",
+      "patch": {
+        "span_start_file_offset": 12318,
+        "span_start_va": 344567838,
+        "span_length": 6,
+        "span_bytes": "c7 00 00 00 00 00",
+        "replacement": "e8 xx xx xx xx 90",
+        "original_instructions": [
+          {
+            "file_offset": 12318,
+            "va": 344567838,
+            "bytes": "c7 00 00 00 00 00",
+            "instruction": "movl\t$0x0, (%rax)"
+          }
+        ],
+        "next_after_span_file_offset": 12324,
+        "entry_registers": {
+          "bar0_register_base": "%rax",
+          "this": "%rbx"
+        },
+        "output_registers": [],
+        "flags_live_after_span": false,
+        "stub_operation": "apv_mmio_write_sync(%rax, 0x1000, 0, 4)   (must not return until the daemon acknowledged the disable)",
+        "notes": "Synchronous dispatch is required so the FIFO is quiesced before the descriptor/map are freed.",
+        "live_after_span_conservative": [
+          "r14",
+          "r8",
+          "r9",
+          "rbx",
+          "rcx",
+          "rdx",
+          "rsi"
+        ],
+        "entry_live_conservative": [
+          "r14",
+          "r8",
+          "r9",
+          "rax",
+          "rbx",
+          "rcx",
+          "rdx",
+          "rsi"
+        ]
+      }
+    },
+    {
+      "id": "S17",
+      "file_offset": 21516,
+      "va": 344577036,
+      "bytes": "c7 80 00 02 00 00 00 00 00 00",
+      "instruction": "movl\t$0x0, 0x200(%rax)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4608,
+      "value_location": "immediate 0x0",
+      "base_register": "%rax",
+      "instruction_length_bytes": 10,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 21526,
+      "next_instruction_va": 344577046,
+      "function": {
+        "mangled": "__ZN24AppleParavirtFramebuffer5startEP9IOService",
+        "demangled": "AppleParavirtFramebuffer::start(IOService*)",
+        "va": 344576980,
+        "file_offset": 21460
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtFramebuffer",
+        "pointer_field_offset": 680,
+        "pointer_load_file_offset": 21509
+      },
+      "prior_list": {
+        "index": 15,
+        "offset": 21516,
+        "annotation": "framebuffer startup write (BAR0+0x1200)",
+        "expected_bytes": "c7 80 00 02 00 00 00 00 00 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "Framebuffer start-up write to BAR0+0x1200. Pure write, no read-back; the daemon applies it while polling.",
+      "patch": null
+    },
+    {
+      "id": "S18",
+      "file_offset": 52320,
+      "va": 344607840,
+      "bytes": "89 88 20 02 00 00",
+      "instruction": "movl\t%ecx, 0x220(%rax)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4640,
+      "value_location": "%ecx (source)",
+      "base_register": "%rax",
+      "instruction_length_bytes": 6,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 52326,
+      "next_instruction_va": 344607846,
+      "function": {
+        "mangled": "____ZN24AppleParavirtDisplayPipe17updateCursorStateEttb_block_invoke",
+        "demangled": "invocation function for block in AppleParavirtDisplayPipe::updateCursorState(unsigned short, unsigned short, bool)",
+        "va": 344607668,
+        "file_offset": 52148
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtDisplayPipe",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 52313
+      },
+      "prior_list": {
+        "index": 16,
+        "offset": 52320,
+        "annotation": "display doorbell (BAR0+0x1220)",
+        "expected_bytes": "89 88 20 02 00 00",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "Cursor-state doorbell from the display-pipe action block. Plain store; no kernel-visible read-back or ordering dependency.",
+      "patch": null
+    },
+    {
+      "id": "S19",
+      "file_offset": 73625,
+      "va": 344629145,
+      "bytes": "89 48 20",
+      "instruction": "movl\t%ecx, 0x20(%rax)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4128,
+      "value_location": "%ecx (source)",
+      "base_register": "%rax",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 73628,
+      "next_instruction_va": 344629148,
+      "function": {
+        "mangled": "__ZN27AppleParavirtVirtualChannel12submitBufferEP24IOAccelCommandDescriptor",
+        "demangled": "AppleParavirtVirtualChannel::submitBuffer(IOAccelCommandDescriptor*)",
+        "va": 344628822,
+        "file_offset": 73302
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtVirtualChannel",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 73618
+      },
+      "prior_list": {
+        "index": 17,
+        "offset": 73625,
+        "annotation": "child FIFO wake (BAR0+0x1020)",
+        "expected_bytes": "89 48 20",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "Channel wake/doorbell after new commands were copied into the FIFO. Plain store; x86 store ordering keeps it after the FIFO data stores.",
+      "patch": null
+    },
+    {
+      "id": "S20",
+      "file_offset": 73750,
+      "va": 344629270,
+      "bytes": "89 48 28",
+      "instruction": "movl\t%ecx, 0x28(%rax)",
+      "width": 4,
+      "kind": "write",
+      "bar0_offset": 4136,
+      "value_location": "%ecx (source)",
+      "base_register": "%rax",
+      "instruction_length_bytes": 3,
+      "rip_relative": false,
+      "uses_non_bar_base_register": false,
+      "next_instruction_file_offset": 73753,
+      "next_instruction_va": 344629273,
+      "function": {
+        "mangled": "__ZN27AppleParavirtVirtualChannel22resetHardwareAndReplayEv",
+        "demangled": "AppleParavirtVirtualChannel::resetHardwareAndReplay()",
+        "va": 344629168,
+        "file_offset": 73648
+      },
+      "mmio_struct": {
+        "object_class": "AppleParavirtVirtualChannel",
+        "pointer_field_offset": 3624,
+        "pointer_load_file_offset": 73743
+      },
+      "prior_list": {
+        "index": 18,
+        "offset": 73750,
+        "annotation": "child FIFO resume (BAR0+0x1028)",
+        "expected_bytes": "89 48 28",
+        "bytes_match": true,
+        "note": ""
+      },
+      "classification": "no_patch_needed",
+      "classification_factors": [],
+      "rationale": "Channel resume/doorbell after resetHardwareAndReplay. Plain store; no read-back and no ordering dependency visible in the kernel.",
+      "patch": null
+    }
+  ]
+}

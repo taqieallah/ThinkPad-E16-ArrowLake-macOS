@@ -1,0 +1,159 @@
+{
+  "comment": "AppleParavirtGPU 25G241 (UUID 0CAE9E29-BC33-315D-82A7-A7D30E9B971E, __TEXT vmaddr 0x14898000) x86_64 inline BAR0 access sites patched by the live bridge. text_offset is relative to the __TEXT segment start (file offset 0). span is the number of original bytes overwritten by a near CALL plus NOP padding and must end on an instruction boundary. original is the exact expected byte sequence. continuation is the __TEXT offset where the site resumes. bar_offset is the absolute BAR0 register offset (Reims decodes (offset-0x1000)/4). base_slot is the offset, inside the stub frame, of the saved GPR that holds the BAR register base on entry. dest is the GPR the read result is written to. reproduce holds original instructions from the span that the stub re-executes after restoring flags (needed because the following instruction consumes the flags). Sites 4-6 complete the audit's patch_required list except the FIFO read cursor (0x100c), which is deliberately served from the shared page: it is polled in the guest's spin loop and must not sleep; the daemon publishes the device cursor every 80 us, so the shadow can only lag the device.",
+  "sites": [
+    {
+      "id": 0,
+      "name": "version-pair",
+      "text_offset": 11484,
+      "span": 7,
+      "original": "89 4a 34 44 8b 62 34",
+      "continuation": 11491,
+      "bar_offset": 4148,
+      "kind": "version_pair",
+      "base_slot": 16,
+      "value_slot": 8,
+      "dest": "r12",
+      "reproduce": "",
+      "role": "AppleParavirtAccelerator::setupVersion (+0x54): write ECX to BAR0+0x1034, then read the negotiated version into R12D"
+    },
+    {
+      "id": 1,
+      "name": "version-fallback-write",
+      "text_offset": 11760,
+      "span": 7,
+      "original": "c7 42 34 06 00 00 80",
+      "continuation": 11767,
+      "bar_offset": 4148,
+      "kind": "write_imm",
+      "base_slot": 16,
+      "value_slot": 255,
+      "immediate": 2147483654,
+      "dest": "none",
+      "reproduce": "",
+      "role": "AppleParavirtAccelerator::setupVersion (+0x168): write the 0x80000006 binary-version word to BAR0+0x1034"
+    },
+    {
+      "id": 2,
+      "name": "stamp-bitmap",
+      "text_offset": 11999,
+      "span": 7,
+      "original": "44 8b 70 18 45 85 f6",
+      "continuation": 12006,
+      "bar_offset": 4120,
+      "kind": "read32",
+      "base_slot": 0,
+      "value_slot": 255,
+      "dest": "r14",
+      "reproduce": "45 85 f6",
+      "role": "AppleParavirtAccelerator::setupInterrupts block (+0x12): read the read-to-clear stamp bitmap from BAR0+0x1018 into R14D, then test R14D"
+    },
+    {
+      "id": 3,
+      "name": "display-bitmap",
+      "text_offset": 12038,
+      "span": 5,
+      "original": "8b 70 14 85 f6",
+      "continuation": 12043,
+      "bar_offset": 4116,
+      "kind": "read32",
+      "base_slot": 0,
+      "value_slot": 255,
+      "dest": "rsi",
+      "reproduce": "85 f6",
+      "role": "AppleParavirtAccelerator::setupInterrupts block (+0x39): read the read-to-clear display bitmap from BAR0+0x1014 into ESI, then test ESI"
+    },
+    {
+      "id": 4,
+      "name": "display-port-count",
+      "text_offset": 4266,
+      "span": 7,
+      "original": "44 8b 88 2c 02 00 00",
+      "continuation": 4273,
+      "bar_offset": 4652,
+      "kind": "read32",
+      "base_slot": 0,
+      "value_slot": 255,
+      "dest": "r9",
+      "reproduce": "",
+      "role": "AppleParavirtGPUControl::start (+0x7c): read the display port count from BAR0+0x122c into R9D"
+    },
+    {
+      "id": 5,
+      "name": "fault-branch",
+      "text_offset": 12064,
+      "span": 6,
+      "original": "83 78 2c 00 74 0c",
+      "continuation": 12082,
+      "branch_target": 12070,
+      "bar_offset": 4140,
+      "kind": "read_branch",
+      "base_slot": 0,
+      "value_slot": 255,
+      "dest": "none",
+      "reproduce": "",
+      "role": "setupInterrupts block (+0x53): read the persistent fault flag BAR0+0x102c; value != 0 -> handleFaultInterrupt (0x2f26), value == 0 -> 0x2f32, reproducing the cmpl/je pair"
+    },
+    {
+      "id": 6,
+      "name": "fifo-disable",
+      "text_offset": 12318,
+      "span": 6,
+      "original": "c7 00 00 00 00 00",
+      "continuation": 12324,
+      "bar_offset": 4096,
+      "kind": "write_imm",
+      "base_slot": 0,
+      "value_slot": 255,
+      "immediate": 0,
+      "dest": "none",
+      "reproduce": "",
+      "role": "AppleParavirtAccelerator::teardownDevice (+0x2e): write 0 to BAR0+0x1000 (FIFO disable); synchronous so the daemon has applied it before teardown frees the FIFO pages"
+    }
+  ],
+  "unpatched_register_reads": [
+    {
+      "text_offset": 11140,
+      "span": 3,
+      "original": "8b 71 0c",
+      "bar_offset": 4108,
+      "role": "AppleParavirtAccelerator::writeFifo (+0x78): poll the root FIFO read cursor at BAR0+0x100c",
+      "serving": "The daemon publishes the cursor into the shared BAR0 cell every poll iteration. A patch is deliberately avoided: this is the guest's spin loop and it must never sleep."
+    }
+  ],
+  "shared_cells": {
+    "guest_written": [
+      "0x1000",
+      "0x1004",
+      "0x1008",
+      "0x1010",
+      "0x101c",
+      "0x1020",
+      "0x1024",
+      "0x1028",
+      "0x1030",
+      "0x1200",
+      "0x1204",
+      "0x1208",
+      "0x120c",
+      "0x1210",
+      "0x1214",
+      "0x1218",
+      "0x121c",
+      "0x1220",
+      "0x1224",
+      "0x1228",
+      "0x1038"
+    ],
+    "daemon_written": [
+      "0x100c",
+      "0x102c",
+      "0x122c",
+      "0x1234"
+    ],
+    "dispatch_served": [
+      "0x1034",
+      "0x1014",
+      "0x1018"
+    ]
+  }
+}

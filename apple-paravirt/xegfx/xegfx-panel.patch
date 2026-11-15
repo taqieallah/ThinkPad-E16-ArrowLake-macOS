@@ -1,0 +1,223 @@
+--- /Users/taqieallah/src/xe-e16/wtl/kexts/XeGfxAccel/accel/nvrm-accel.cpp	2026-11-12 02:56:10
++++ xegfx/wtl/kexts/XeGfxAccel/accel/nvrm-accel.cpp	2026-11-15 13:24:25
+@@ -24,6 +24,9 @@
+ #include <IOKit/IOWorkLoop.h>
+ #include <IOKit/IOTimerEventSource.h>
+ #include <IOKit/IOMemoryDescriptor.h>
++#include <kern/task.h>
++#include "xg_panel_abi.h"
++static bool nvXgPanelHeldFlag();
+ #include "IOAccelerator.h"
+ #include "IOGraphicsAccelerator2.h"
+ #include "IOAccelEventMachineFast2.h"
+@@ -257,6 +260,10 @@
+     IOLock *fOpenLock = nullptr;
+     int     fOpenMinor[kXgMaxOpen] = {};
+     int     fOpenPid[kXgMaxOpen] = {};
++    task_t  fOwnerTask = TASK_NULL;
++    bool    fPanelToken = false;
++    IOReturn panelMethod(IOExternalMethodArguments *a);
++    void    panelRelease();
+     void closeAll() {
+         if (!fOpenLock) return;
+         for (unsigned i = 0; i < kXgMaxOpen; i++) {
+@@ -278,17 +285,21 @@
+ public:
+     bool initWithTask(task_t t, void *sid, UInt32 type) APPLE_KEXT_OVERRIDE {
+         if (!IOUserClient::initWithTask(t, sid, type)) return false;
++        fOwnerTask = t;
+         fOpenLock = IOLockAlloc();
+         return fOpenLock != nullptr;
+     }
+     void free() APPLE_KEXT_OVERRIDE {
++        panelRelease();
+         closeAll();
+         if (fOpenLock) { IOLockFree(fOpenLock); fOpenLock = nullptr; }
+         IOUserClient::free();
+     }
+-    IOReturn clientClose() APPLE_KEXT_OVERRIDE { closeAll(); terminate(); return kIOReturnSuccess; }
++    IOReturn clientClose() APPLE_KEXT_OVERRIDE { panelRelease(); closeAll(); terminate(); return kIOReturnSuccess; }
+     IOReturn externalMethod(uint32_t sel, IOExternalMethodArguments *a, IOExternalMethodDispatch *,
+                             OSObject *, void *) APPLE_KEXT_OVERRIDE {
++        // selector 5 ('XGPP' by ABI number): external panel producer (Reims -> panel)
++        if (sel == XG_PANEL_SELECTOR) return panelMethod(a);
+         // selector 2 (kind 0 card / 1 render, DRM minor) -> (instance minor, errno)
+         if (sel == 2) {
+             if (a->scalarInputCount != 2 || a->scalarOutputCount != 2) return kIOReturnBadArgument;
+@@ -1715,6 +1726,7 @@
+ #ifdef NMX_XEGFX
+         // E16: the copy runs on a worker (waits for the composite, the vblank, then copies) and the transaction
+         // completes through signalTransactionInterrupt, as the NVIDIA async flip does. WindowServer is not held.
++        if (head == 4 && nvXgPanelHeldFlag()) return kIOReturnSuccess;   // external panel producer owns the plane
+         if (head == 4 && gXeAsyncCopy && nvXeCopyQueue(this, fb, head, s)) return kIOReturnSuccess;
+ #endif
+         // A copied frame must come from the surface's newest pixels. Copying while they were still only in VRAM put a
+@@ -3262,6 +3274,53 @@
+ static unsigned long long gXeFlipBytes; static uint32_t gXeFlipOrigSurf; static int gXeFlipPipe = -1;
+ static IOSurface *gXeFlipFront, *gXeFlipPrev;
+ static IOService *gXeFlipRes;
++// ---- E16 external panel producer ---------------------------------------------------------------
++// A userspace producer (the Reims daemon) opens this accelerator's 'XGDR' user client and uses
++// selector 5 to take the internal panel, present IOSurface frames with the plane's exact geometry
++// and pitch (mapped through the core's GGTT flip slots, PLANE_SURF armed, FRMCOUNT latched), and
++// give the panel back. While the token is held the internal producer's frames are consumed but
++// never touch the plane.
++static volatile uint32_t gXgPanelHeld = 0;
++static uint32_t gXgPanelHomeSurface = 0;
++static IOLock *gXgPanelLock = nullptr;
++static IOMemoryMap *gXgPanelPixMap = nullptr;
++static unsigned gXgPanelPixMapId = 0;
++static const char gXgPanelMarker[] __attribute__((used)) = "XG_PANEL ABI 1";
++
++static bool nvXgPanelHeldFlag() { return __atomic_load_n(&gXgPanelHeld, __ATOMIC_ACQUIRE) != 0; }
++
++static volatile uint32_t *nvXgPanelRegs()
++{
++    if (!gXeMmio && NVAccel::gAccel && NVAccel::gAccel->fPCI)
++        gXeMmio = NVAccel::gAccel->fPCI->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0, kIOMapInhibitCache);
++    if (!gXeMmio || gXeMmio->getLength() < 0x80000) return nullptr;
++    return (volatile uint32_t *)gXeMmio->getVirtualAddress();
++}
++static int nvXgPanelPipe(volatile uint32_t *r, uint32_t *w, uint32_t *h, uint32_t *pitch)
++{
++    if (!r) return -1;
++    for (int p = 0; p < 4; p++) {
++        if (!(r[(0x70008 + p * 0x1000) / 4] & 0x80000000u)) continue;              // transcoder off
++        const uint32_t ctl = r[(0x70180 + p * 0x1000) / 4];
++        if (!(ctl & 0x80000000u) || (ctl & (7u << 10)) || ((ctl >> 24) & 0xf) != 8) continue;  // on, linear, 32bpp
++        const uint32_t size = r[(0x70190 + p * 0x1000) / 4];
++        const uint32_t stride = (r[(0x70188 + p * 0x1000) / 4] & 0x7ff) * 64u;
++        const uint32_t pw = (size & 0xffff) + 1, ph = ((size >> 16) & 0xffff) + 1;
++        if (!pw || !ph || !stride) continue;
++        *w = pw; *h = ph; *pitch = stride; return p;
++    }
++    return -1;
++}
++static void *nvXgPanelSurface(unsigned id, task_t task)
++{
++    if (!id || !task) return nullptr;
++    if (!gNVSVRoot) {
++        OSDictionary *m = IOService::serviceMatching("IOSurfaceRoot");
++        if (m) { gNVSVRoot = IOService::waitForMatchingService(m, 5ULL * 1000 * 1000 * 1000); m->release(); }
++        if (!gNVSVRoot) return nullptr;
++    }
++    return _ZN13IOSurfaceRoot13lookupSurfaceEjP4task(gNVSVRoot, id, task);
++}
+ SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip_hold, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlipHold, 0, "E16: 1 = one frame in flight (default); 2 = one in flight + one queued, none dropped; 0 = no wait, newest wins (drops)");
+ SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlip, 0, "E16: 1 = scan the composited frame out of its own pages through a GGTT slot (no copy; needs XeGfx core with xgFlipInit)");
+ SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_flip_clflush, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeFlipClflush, 0, "E16: 1 = flush the frame from the CPU caches before the plane scans it (default)");
+@@ -3405,6 +3464,7 @@
+ {
+     NVAccel *a = NVAccel::gAccel;
+     if (!a || !fb || !s) return false;
++    if (nvXgPanelHeldFlag()) return true;   // external panel producer owns the plane
+     nvXeWaitFrame(s->getSurfaceID());   // K9b: surface mark OR GT idle, bounded
+     if (!nvAccelSurfCopyReady(s, head)) return true;   // keeps the previous picture, as the inline path does
+     if (s->getPixelFormat() != 0x42475241u) return false;
+@@ -3438,6 +3498,106 @@
+     (void)w;
+     OSAddAtomic64(1, &gCntIopSrcSurf); OSAddAtomic64(1, &gCntIopOk); OSAddAtomic64(1, &gCntIopOkHead[head]);
+     return true;
++}
++
++// ---- E16 external panel producer: the selector-5 method and the token lifecycle ----------------
++void IOAccelXeGfxDRMClient::panelRelease()
++{
++    if (!fPanelToken) return;
++    fPanelToken = false;
++    // nvXeFlipHome writes the surface captured at the first flip (which, after ACQUIRE, is the home
++    // surface the plane had) and only then releases the retained frames, so the plane never scans
++    // freed pages. It also settles a live internal flip.
++    nvXeFlipHome();
++    if (gXgPanelPixMap) { gXgPanelPixMap->release(); gXgPanelPixMap = nullptr; }
++    gXgPanelPixMapId = 0;
++    gXgPanelHomeSurface = 0;
++    __atomic_store_n(&gXgPanelHeld, 0, __ATOMIC_RELEASE);
++    ALOG("panel: external producer released the panel");
++}
++
++IOReturn IOAccelXeGfxDRMClient::panelMethod(IOExternalMethodArguments *a)
++{
++    if (!a || !a->structureInput || !a->structureOutput ||
++        a->structureInputSize < sizeof(struct xg_panel_request) ||
++        a->structureOutputSize < sizeof(struct xg_panel_reply))
++        return kIOReturnBadArgument;
++    struct xg_panel_request req; bzero(&req, sizeof req);
++    memcpy(&req, a->structureInput, sizeof req);
++    if (req.struct_size != sizeof req || req.op > XG_PANEL_OP_RELEASE) return kIOReturnBadArgument;
++    struct xg_panel_reply rep; bzero(&rep, sizeof rep);
++    rep.struct_size = sizeof rep;
++
++    volatile uint32_t *r = nvXgPanelRegs();
++    uint32_t w = 0, h = 0, pitch = 0;
++    int pipe = nvXgPanelPipe(r, &w, &h, &pitch);
++
++    switch (req.op) {
++    case XG_PANEL_OP_INFO:
++        rep.status = (pipe < 0) ? XG_PANEL_ERR_PLANE : XG_PANEL_OK;
++        rep.pipe = pipe < 0 ? 0xffffffffu : (uint32_t)pipe;
++        rep.width = w; rep.height = h; rep.pitch = pitch;
++        rep.format = XG_PANEL_FORMAT_BGRA; rep.refresh_hz = 0; rep.present_count = 0;
++        break;
++    case XG_PANEL_OP_ACQUIRE: {
++        if (pipe < 0) { rep.status = XG_PANEL_ERR_PLANE; break; }
++        if (!gXgPanelLock) {
++            IOLock *l = IOLockAlloc();
++            if (l && !OSCompareAndSwapPtr(nullptr, l, (void *volatile *)&gXgPanelLock)) IOLockFree(l);
++        }
++        if (!gXgPanelLock) { rep.status = XG_PANEL_ERR_STATE; break; }
++        IOLockLock(gXgPanelLock);
++        if (fPanelToken) { IOLockUnlock(gXgPanelLock); rep.status = XG_PANEL_OK; break; }
++        if (__atomic_load_n(&gXgPanelHeld, __ATOMIC_ACQUIRE)) { IOLockUnlock(gXgPanelLock); rep.status = XG_PANEL_ERR_BUSY; break; }
++        if (gXeFlipLive != ~0u) nvXeFlipHome();               // settle the internal producer first
++        pipe = nvXgPanelPipe(r, &w, &h, &pitch);
++        if (pipe < 0) { IOLockUnlock(gXgPanelLock); rep.status = XG_PANEL_ERR_PLANE; break; }
++        if (gIopVblPipe < 0) gIopVblPipe = pipe;              // nvXeFlipNow arms this pipe
++        gXgPanelHomeSurface = r[(0x7019c + pipe * 0x1000) / 4] & ~0xfffu;
++        __atomic_store_n(&gXgPanelHeld, 1, __ATOMIC_RELEASE);
++        fPanelToken = true;
++        IOLockUnlock(gXgPanelLock);
++        ALOG("panel: external producer acquired pipe %c %ux%u pitch %u (home surface 0x%x)",
++             'A' + pipe, w, h, pitch, gXgPanelHomeSurface);
++        rep.status = XG_PANEL_OK; rep.pipe = (uint32_t)pipe; rep.width = w; rep.height = h;
++        rep.pitch = pitch; rep.format = XG_PANEL_FORMAT_BGRA;
++        break;
++    }
++    case XG_PANEL_OP_PRESENT: {
++        if (!fPanelToken) { rep.status = XG_PANEL_ERR_NO_TOKEN; break; }
++        if (pipe < 0) { rep.status = XG_PANEL_ERR_PLANE; break; }
++        IOSurface *s = (IOSurface *)nvXgPanelSurface(req.surface_id, fOwnerTask);
++        if (!s) { rep.status = XG_PANEL_ERR_SURFACE; break; }
++        const unsigned long long W = s->getWidth(), H = s->getHeight(), P = s->getBytesPerRow();
++        const bool good = s->getPixelFormat() == 0x42475241u && W == w && H == h && P == pitch &&
++                          (P & 63) == 0 && H != 0 && (H * P) <= (16ull << 20);
++        IOMemoryDescriptor *md = good ? s->getMemoryDescriptor() : nullptr;
++        if (!good || !md) { ((OSObject *)s)->release(); rep.status = XG_PANEL_ERR_SURFACE; break; }
++        const unsigned bytes = (unsigned)(H * P);
++        if (gXgPanelPixMapId != req.surface_id) {
++            if (gXgPanelPixMap) { gXgPanelPixMap->release(); gXgPanelPixMap = nullptr; }
++            gXgPanelPixMap = md->map(kIOMapDefaultCache);
++            gXgPanelPixMapId = gXgPanelPixMap ? req.surface_id : 0;
++        }
++        const volatile unsigned int *src = gXgPanelPixMap
++            ? (const volatile unsigned int *)gXgPanelPixMap->getVirtualAddress() : nullptr;
++        const bool flipped = nvXeFlipNow(nullptr, (unsigned)H, s, P, src);
++        ((OSObject *)s)->release();                            // nvXeFlipNow kept its own references
++        rep.status = flipped ? XG_PANEL_OK : XG_PANEL_ERR_LATCH;
++        rep.pipe = (uint32_t)pipe; rep.width = w; rep.height = h; rep.pitch = pitch;
++        rep.format = XG_PANEL_FORMAT_BGRA;
++        if ((req.sequence % 120) == 0)
++            ALOG("panel: present #%u surface %u %ux%u pitch %u -> %s", (unsigned)req.sequence,
++                 req.surface_id, (unsigned)W, (unsigned)H, (unsigned)P, flipped ? "ok" : "failed");
++        break;
++    }
++    case XG_PANEL_OP_RELEASE:
++        panelRelease();
++        rep.status = XG_PANEL_OK;
++        break;
++    }
++    memcpy(a->structureOutput, &rep, sizeof rep);
++    return kIOReturnSuccess;
+ }
+ #endif
+ 

@@ -1,0 +1,119 @@
+# DENIED-SYMBOLS.txt - referenced or planned, but NOT importable on 25G241
+# evidence: /Volumes/1401/xegfx-e16/diag-25G241/{Boot,System}KernelExtensions.kc,
+#           built probe kexts, reference-0.1.10.kext (a build that loads on the target)
+#
+# ---------------------------------------------------------------------------
+# 1) IOPCIDevice subclass vtable placeholders that kxld fills from the parent vtable
+# ---------------------------------------------------------------------------
+# Referenced by FakePCINubProbe.kext (and by reference-0.1.10.kext): 9 symbols,
+# absent from BOTH collections, not exported by any bundle:
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice3Ev
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice4Ev
+__ZN11IOPCIDevice21_RESERVEDIOPCIDevice5Ev
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice16Ev
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice17Ev
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice18Ev
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice19Ev
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice20Ev
+__ZN11IOPCIDevice22_RESERVEDIOPCIDevice21Ev
+#   status: NOT a link failure at load time. clang emits these names for the
+#   IOPCIDevice virtual slots the subclass leaves unimplemented; kxld replaces the
+#   slot from IOPCIDevice's vtable. Evidence: reference-0.1.10.kext has exactly the
+#   same 9 undefined symbols and loads on the ThinkPad (k21-dump/loaded.txt).
+#   recommendation: none in the source. Validate with
+#       linkcheck.py FakePCINubProbe.kext --kc BootKernelExtensions.kc --baseline reference-0.1.10.kext
+#   which reports them "not exported, but the baseline lacks them too" and ends ok.
+#
+# ---------------------------------------------------------------------------
+# 2) another kext's _kmod_info (e.g. com.apple.driver.AppleParavirtGPU's)
+# ---------------------------------------------------------------------------
+# _kmod_info
+#   status: every one of the 204 Boot-collection members and every one of the 172
+#   System-collection members exports a symbol named _kmod_info (plus the kernel
+#   exports one at com.apple.kernel). The name is NOT a per-bundle handle:
+#       linkcheck vs Boot   -> owner com.apple.kernel                       "ok"
+#       linkcheck vs System -> owner com.apple.kext.AMD10000Controller     NOT IN OSBundleLibraries
+#   Both results are artefacts of linkcheck's first-match table; neither binds to
+#   AppleParavirtGPU. In a real kext the symbol is already defined by libkmod.a's
+#   kmod_info declaration (KmodShadowProbe.kext has 0 undefined symbols), so an
+#   extern _kmod_info reference resolves to the kext's OWN kmod_info.
+#   The kernel's exported _kmod_info is a placeholder: in the Boot collection
+#   kernel _kmod_info and _invalid_kmod_info are the same address (0xffffff80011e3790,
+#   name "invalid"); the real kernel kmod_info is the separate export
+#   _g_kernel_kmod_info (0xffffff80011e3860, name "__kernel__").
+#   recommendation: do not import _kmod_info. If APV code/data is needed, import a
+#   unique APV-exported symbol and declare com.apple.driver.AppleParavirtGPU in
+#   OSBundleLibraries (APV exports 1154 symbols, e.g. __Z11setupAPVLogv, _APVLog,
+#   class gMetaClass symbols). For a kext load address, use the OSKext API
+#   (OSKext::lookupKextWithIdentifier, exported by com.apple.kernel) or the unique
+#   kernel export _g_kernel_kmod_info and walk its .next list at runtime.
+#
+# ---------------------------------------------------------------------------
+# 3) API names that do not exist on 25G241 (referenced by the plan, not the ABI)
+# ---------------------------------------------------------------------------
+# IOUserClient::copyClientMemoryForType
+#   status: does not exist. The 25G241 IOUserClient.h declares the virtual
+#   clientMemoryForType(UInt32, IOOptionBits*, IOMemoryDescriptor**) instead;
+#   grep of the SDK finds no "copyClientMemoryForType", and neither collection has
+#   a symbol containing it (0 hits).
+#   recommendation: override clientMemoryForType (exported symbol
+#   __ZN12IOUserClient19clientMemoryForTypeEjPjPP18IOMemoryDescriptor, owner
+#   com.apple.kernel; virtual override needs no import, a qualified call compiles to
+#   a __ZTV12IOUserClient vtable slot).
+#
+# IOUserClient::clientTask
+#   status: does not exist in the 25G241 SDK/ABI. IOUserClient.h has no clientTask
+#   member and both collections export no such symbol; the owning task arrives in
+#   IOUserClient::initWithTask(task_t, void*, UInt32 [, OSDictionary*]) (overridden
+#   in UserClientProbe.kext), optionally paired with
+#   IOUserClient::initWithTask (exported __ZN12IOUserClient12initWithTaskEP4taskPvj).
+#   recommendation: store owningTask in the override and use it for
+#   IOMemoryDescriptor::createMappingInTask(task, atAddress, ...).
+#
+# kIOMapFixed
+#   status: no such constant. IOTypes.h defines kIOMapAnywhere (0x1),
+#   kIOMapOverwrite (0x20000000) and the cache/read-only bits; grep of the whole
+#   MacKernelSDK finds no kIOMapFixed.
+#   recommendation: for a placed (fixed-address) mapping pass atAddress and do NOT
+#   set kIOMapAnywhere; add kIOMapOverwrite if an existing mapping at atAddress must
+#   be replaced. Cache: kIOMapCopybackCache for RAM, kIOMapInhibitCache/default for
+#   MMIO. See IOMemoryDescriptor.h createMappingInTask discussion.
+#
+# IOMemoryDescriptor::getPhysicalSegment (direct symbol)
+#   status: no importable symbol. It is pure virtual in IOMemoryDescriptor under
+#   LP64 and the concrete overrides are reached through the vtable; the only address
+#   classes exported are IOMemoryMap/IOSubMemoryDescriptor/IOMultiMemoryDescriptor
+#   getPhysicalSegment. An ordinary virtual call (buf->getPhysicalSegment(...)) needs
+#   no symbol and is what the probe uses.
+#   recommendation: keep the call virtual; do not take its address/qualify it.
+#
+# IOMemoryDescriptor::getBytesNoCopy (base-class symbol)
+#   status: IOMemoryDescriptor does not export it. IOBufferMemoryDescriptor's
+#   overrides are exported (com.apple.kernel):
+#       __ZN24IOBufferMemoryDescriptor14getBytesNoCopyEv
+#       __ZN24IOBufferMemoryDescriptor14getBytesNoCopyEmm
+#   A qualified call in kext code compiles to a __ZTV24IOBufferMemoryDescriptor slot,
+#   so the vtable symbol is the actual import (exported, com.apple.kernel).
+#   recommendation: call it on an IOBufferMemoryDescriptor instance, virtual or
+#   qualified; no extra OSBundleLibraries entry.
+#
+# ---------------------------------------------------------------------------
+# 4) ambiguous-by-linkage, but exported and usable (listed here only as a warning)
+# ---------------------------------------------------------------------------
+# IOMallocContiguous / IOFreeContiguous
+#   status: still exported by com.apple.kernel on 25G241
+#   (_IOMallocContiguous @0xffffff8000a85c30, _IOFreeContiguous @0xffffff8000a85de0),
+#   but the 25G241 headers mark both deprecated.
+#   recommendation: prefer IOBufferMemoryDescriptor::inTaskWithOptions(...,
+#   kIOMemoryPhysicallyContiguous, ...) + getPhysicalSegment(), and IOMalloc/IOFree
+#   for non-contiguous memory.
+#
+# OSKext::lookupKextWithIdentifier
+#   status: NOT denied. Exported by com.apple.kernel:
+#   __ZN6OSKext24lookupKextWithIdentifierEPKc  @0xffffff8000a39ef0
+#   __ZN6OSKext24lookupKextWithIdentifierEP8OSString
+#   The earlier "0 OSKext exports on 25G241" observation comes from checking only
+#   SystemKernelExtensions.kc, which has no kernel entry. OSKext.h itself is not
+#   compilable from MacKernelSDK (it includes libkern/kernel_mach_header.h,
+#   libkern/kxld.h and libkern/OSKextLibPrivate.h, none of which ship there), so the
+#   probe declares the two functions by their exact Mach-O names.
