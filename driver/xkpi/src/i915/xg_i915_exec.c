@@ -280,6 +280,16 @@ xg_i915_freq(int *act, int *req, int *min, int *max, int *rp0, int *slpc)
 	return (0);
 }
 
+/*
+ * E16 k22: late-frame clock floor (the idea of ArrowWhatever 0035/0036, written for this tree). SLPC keeps the GT at its
+ * efficiency clock while WindowServer's composites are short and frequent, and the desktop misses vblanks; the flip
+ * worker raises the SLPC floor here while frames are late and puts the previous floor back afterwards. A floor the user
+ * writes (debug.xegfx_gt_min_mhz) while the boost holds is kept and applied when it ends. Thread context only (the
+ * SLPC request waits for the GuC).
+ */
+static volatile int xg_boost_on;	/* 1 while the floor is raised */
+static volatile int xg_boost_saved;	/* the floor to go back to, MHz */
+
 int
 xg_i915_set_min_freq(int mhz)
 {
@@ -288,5 +298,47 @@ xg_i915_set_min_freq(int mhz)
 
 	if (!i915)
 		return (-ENODEV);
+	if (__atomic_load_n(&xg_boost_on, __ATOMIC_ACQUIRE)) {
+		__atomic_store_n(&xg_boost_saved, mhz, __ATOMIC_RELEASE);	/* applied when the boost ends */
+		return (0);
+	}
 	return (intel_rps_set_min_frequency(&to_gt(i915)->rps, (u32)mhz));
+}
+
+/* mhz > 0: raise the floor to mhz (capped at the current maximum; 1 = the maximum); mhz == 0: back to the saved floor.
+ * Returns the floor now in force in MHz, or a negative errno. Repeated raises while on do nothing. */
+int
+xg_i915_gt_boost(int mhz)
+{
+	struct pci_dev *pdev = NULL;
+	struct drm_i915_private *i915 = xg_i915_find(&pdev);
+	struct intel_rps *rps;
+	int mx, err;
+
+	if (!i915)
+		return (-ENODEV);
+	rps = &to_gt(i915)->rps;
+	if (mhz > 0) {
+		int expect = 0;
+		if (!__atomic_compare_exchange_n(&xg_boost_on, &expect, 1, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+			return ((int)intel_rps_get_min_frequency(rps));
+		__atomic_store_n(&xg_boost_saved, (int)intel_rps_get_min_frequency(rps), __ATOMIC_RELEASE);
+		mx = (int)intel_rps_get_max_frequency(rps);
+		if (mhz == 1 || mhz > mx)
+			mhz = mx;
+		err = intel_rps_set_min_frequency(rps, (u32)mhz);
+		if (err) {
+			__atomic_store_n(&xg_boost_on, 0, __ATOMIC_RELEASE);
+			return (err < 0 ? err : -EIO);
+		}
+		return (mhz);
+	}
+	{
+		int expect = 1;
+		if (!__atomic_compare_exchange_n(&xg_boost_on, &expect, 0, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+			return ((int)intel_rps_get_min_frequency(rps));
+	}
+	mhz = __atomic_load_n(&xg_boost_saved, __ATOMIC_ACQUIRE);
+	err = intel_rps_set_min_frequency(rps, (u32)mhz);
+	return (err ? (err < 0 ? err : -EIO) : mhz);
 }

@@ -2059,6 +2059,13 @@ static void nvaccelInstallSysctl(void)
       sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_free); sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_mark);
       sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_idle); sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_forced);
       sysctl_register_oid(&sysctl__debug_nvaccel_xe_k9_max_us); }   // E16 K9b
+    { extern struct sysctl_oid sysctl__debug_nvaccel_xe_boost_us, sysctl__debug_nvaccel_xe_boost_hold_ms, sysctl__debug_nvaccel_xe_boost_mhz,
+          sysctl__debug_nvaccel_xe_late, sysctl__debug_nvaccel_xe_boosts, sysctl__debug_nvaccel_xe_boost_fail,
+          sysctl__debug_nvaccel_xe_boost_on, sysctl__debug_nvaccel_xe_boost_floor;
+      sysctl_register_oid(&sysctl__debug_nvaccel_xe_boost_us); sysctl_register_oid(&sysctl__debug_nvaccel_xe_boost_hold_ms);
+      sysctl_register_oid(&sysctl__debug_nvaccel_xe_boost_mhz); sysctl_register_oid(&sysctl__debug_nvaccel_xe_late);
+      sysctl_register_oid(&sysctl__debug_nvaccel_xe_boosts); sysctl_register_oid(&sysctl__debug_nvaccel_xe_boost_fail);
+      sysctl_register_oid(&sysctl__debug_nvaccel_xe_boost_on); sysctl_register_oid(&sysctl__debug_nvaccel_xe_boost_floor); }   // E16 k22
     nvXeTraceStart();
 #endif
     sysctl_register_oid(&sysctl__debug_nvaccel_heads_published); sysctl_register_oid(&sysctl__debug_nvaccel_heads_registered);
@@ -3381,15 +3388,88 @@ static bool nvXeSurfPending(unsigned id)
     IOLockUnlock(l);
     return pend;
 }
+// ---- E16 k22: late-frame GPU clock floor (ArrowWhatever 0035/0036's idea, by Mountainatic, written for this tree) --
+// SLPC holds the GT at its efficiency clock while WindowServer's composites are short and frequent, so they finish late
+// and the desktop misses vblanks (ArrowWhatever measured the genie effect at 42 fps stuck at RPn, 93 fps with the
+// floor). i915's waitboost never fires here: the worker waits for the plugin's surface mark, not an i915 fence. A
+// frame whose composite is still running xe_boost_us after the worker took it raises the SLPC floor (core "xgGtMin");
+// a thread call puts the previous floor back xe_boost_hold_ms after the last late frame. Needs the completion marks
+// (nvaccel_surface_gpu_on=1), as in xe-up --fast.
+static int gXeBoostUs = 3000, gXeBoostHoldMs = 150, gXeBoostMhz = 1;
+static SInt64 gCntXeLate, gCntXeBoosts, gCntXeBoostFail;
+static int gXeBoostOn, gXeBoostFloor;
+static volatile uint64_t gXeLastLateAbs;
+static struct thread_call *gXeBoostCall;
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_boost_us, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeBoostUs, 0, "E16 k22: a composite still running this long after the worker took its frame raises the GPU clock floor (us; 0 = off)");
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_boost_hold_ms, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeBoostHoldMs, 0, "E16 k22: the floor goes back this long after the last late frame (ms)");
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_boost_mhz, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, &gXeBoostMhz, 0, "E16 k22: the raised floor in MHz (1 = the GPU's maximum)");
+SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_late, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeLate, "E16 k22: frames whose composite was still running at xe_boost_us");
+SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_boosts, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeBoosts, "E16 k22: times the floor was raised");
+SYSCTL_QUAD(_debug, OID_AUTO, nvaccel_xe_boost_fail, CTLFLAG_RD | CTLFLAG_LOCKED, &gCntXeBoostFail, "E16 k22: raises or restores the core refused");
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_boost_on, CTLFLAG_RD | CTLFLAG_LOCKED, &gXeBoostOn, 0, "E16 k22: 1 while the floor is raised");
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_xe_boost_floor, CTLFLAG_RD | CTLFLAG_LOCKED, &gXeBoostFloor, 0, "E16 k22: the floor the core reported last, MHz");
+static void nvXeBoostEnd(void *, void *)
+{
+    uint64_t ns = 0;
+    absolutetime_to_nanoseconds(mach_absolute_time() - __atomic_load_n(&gXeLastLateAbs, __ATOMIC_ACQUIRE), &ns);
+    const uint64_t holdNs = (uint64_t)(gXeBoostHoldMs > 0 ? gXeBoostHoldMs : 150) * 1000000ull;
+    if (ns < holdNs) {   // a later frame was late too: wait out the rest
+        uint64_t dl = 0; clock_interval_to_deadline((uint32_t)((holdNs - ns) / 1000ull) + 1, kMicrosecondScale, &dl);
+        thread_call_enter_delayed(gXeBoostCall, dl);
+        return;
+    }
+    int res = -1;
+    if (nvXeResidentCall("xgGtMin", (void *)(intptr_t)0, nullptr, nullptr, &res) != kIOReturnSuccess || res < 0)
+        OSAddAtomic64(1, &gCntXeBoostFail);
+    else gXeBoostFloor = res;
+    __atomic_store_n(&gXeBoostOn, 0, __ATOMIC_RELEASE);
+}
+static void nvXeLateFrame(void)
+{
+    OSAddAtomic64(1, &gCntXeLate);
+    __atomic_store_n(&gXeLastLateAbs, mach_absolute_time(), __ATOMIC_RELEASE);
+    if (!gXeBoostCall) { thread_call_t c = thread_call_allocate(nvXeBoostEnd, nullptr);
+        if (c && !OSCompareAndSwapPtr(nullptr, c, (void *volatile *)&gXeBoostCall)) thread_call_free(c); }
+    if (!gXeBoostCall) return;
+    if (!__atomic_load_n(&gXeBoostOn, __ATOMIC_ACQUIRE)) {
+        int res = -1;
+        if (nvXeResidentCall("xgGtMin", (void *)(intptr_t)(gXeBoostMhz > 0 ? gXeBoostMhz : 1), nullptr, nullptr, &res) != kIOReturnSuccess
+            || res < 0) {
+            const SInt64 f = OSAddAtomic64(1, &gCntXeBoostFail);
+            if (f < 4) ALOG("iop: E16 k22: the core refused the GPU clock floor (%d)", res);
+            return;
+        }
+        gXeBoostFloor = res;
+        __atomic_store_n(&gXeBoostOn, 1, __ATOMIC_RELEASE);
+        const SInt64 n = OSAddAtomic64(1, &gCntXeBoosts);
+        if (n < 8 || (n & 255) == 0) ALOG("iop: E16 k22: late frame - GPU clock floor %d MHz (%lld raises)", res, (long long)n + 1);
+    }
+    uint64_t dl = 0; clock_interval_to_deadline((uint32_t)(gXeBoostHoldMs > 0 ? gXeBoostHoldMs : 150), kMillisecondScale, &dl);
+    thread_call_enter_delayed(gXeBoostCall, dl);
+}
+// Waits up to xe_boost_us for the surface's mark; a frame still pending then is late. True when it became ready.
+static bool nvXeBoostWait(unsigned id, uint64_t t0)
+{
+    if (gXeBoostUs <= 0) return false;
+    while (nvXeSurfPending(id)) {
+        if (nvXeUs(t0) >= (uint64_t)gXeBoostUs) { nvXeLateFrame(); return false; }
+        IODelay(250);
+    }
+    return true;
+}
 static void nvXeWaitFrame(unsigned id)
 {
-    if (!gXeK9 || !gXeFlip || gXeK9NoQuery) { nvSurfWaitReady(id); return; }
+    if (!gXeK9 || !gXeFlip || gXeK9NoQuery) {
+        if (gSurfGpuOn && nvXeSurfPending(id)) (void)nvXeBoostWait(id, mach_absolute_time());   // E16 k22
+        nvSurfWaitReady(id); return; }
     if (!nvXeSurfPending(id)) { OSAddAtomic64(1, &gCntXeK9Free); return; }
     const uint64_t t0 = mach_absolute_time();
     const unsigned budgetUs = (unsigned)((gXeIdleMs > 0 && gXeIdleMs <= 100 ? gXeIdleMs : 40) * 1000);
     SInt64 *why = &gCntXeK9Forced;
+    bool boostChecked = gXeBoostUs <= 0;
     for (;;) {
         if (!nvXeSurfPending(id)) { why = &gCntXeK9Mark; break; }
+        if (!boostChecked && nvXeUs(t0) >= (uint64_t)gXeBoostUs) { boostChecked = true; nvXeLateFrame(); }   // E16 k22
         int idle = 0;
         if (nvXeResidentCall("xgFlipQuery", &idle, nullptr, nullptr, nullptr) != kIOReturnSuccess || idle < 0) {
             gXeK9NoQuery = 1; ALOG("iop: E16 K9b: core has no xgFlipQuery - surface marks only"); nvSurfWaitReady(id); return; }

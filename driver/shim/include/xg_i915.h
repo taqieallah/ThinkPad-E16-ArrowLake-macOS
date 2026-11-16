@@ -54,6 +54,8 @@ int xg_i915_reserve_bootfb(unsigned long long offset, unsigned long long size);
 int xg_i915_idle(void);
 int xg_i915_freq(int *act, int *req, int *min, int *max, int *rp0, int *slpc);   /* E16: MHz */
 int xg_i915_set_min_freq(int mhz);
+/* E16 k22: raise the SLPC floor (mhz > 0, 1 = maximum) or put the previous floor back (0); the floor in force or -errno */
+int xg_i915_gt_boost(int mhz);
 #define XG_FLIP_MAX_SLOTS	8
 /* zero-copy scanout: reserve GGTT slots, then point one slot's PTEs at a frame's physical pages; 0 or -errno */
 int xg_flip_init(unsigned long long surface_bytes, unsigned int slots, unsigned long long *ggtt_out,

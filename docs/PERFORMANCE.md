@@ -22,6 +22,7 @@ macOS showed no refresh-rate choice. That is expected: IOGraphics hides the choi
 | Async copy worker, `hold=1` | fewer glitches, much slower |
 | **Zero-copy flip** (ArrowWhatever 0008 core + own accelerator side) | `xe_flips` 2516, `flip_miss` 0, `flip_fail` 0; glitches mostly gone |
 | **K9b** (surface-ready **or** GT idle, ≤ 40 ms) with `surface_gpu_on=1` | 1279 frames: free 419 / mark 161 / idle 699, **forced 0, timeouts 0**, longest wait 16.8 ms |
+| **k22 late-frame GPU clock floor** (ArrowWhatever measured SLPC stuck at RPn: genie 42 -> 93 fps with it) | built, not yet measured on the E16: `scripts/k22/k22-measure.sh` A/B |
 
 Measured smoothness after flip + K9b: **less than 10 % better** than before. So the remaining cost is not on the
 display side.

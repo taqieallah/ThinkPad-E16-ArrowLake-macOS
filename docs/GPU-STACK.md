@@ -41,6 +41,7 @@ Refuses to run when ArcXe owns the GPU (ArcMTL test boot).
 | Change | Why |
 |---|---|
 | `xg_i915_flip.c` + `xgFlipInit/Map/Unmap/Query` platform functions (ArrowWhatever 0008) | reserve GGTT slots below 4 GiB and point their PTEs at a frame's pages, for zero-copy scanout; `xgFlipQuery` = all engines idle |
+| `xg_i915_gt_boost` + `xgGtMin` platform function (k22) | raise the SLPC minimum clock (1 = the maximum) or put the previous floor back; a `debug.xegfx_gt_min_mhz` write during a boost is applied when it ends |
 | `xg_kext.cpp`: a failing stage no longer stops the stage loop | same as the HONOR binary patch at `0x243e5e` |
 | `xg_i915_exec.c`: four `pci_dev_put()` removed | `xg_i915_find` takes no reference (HONOR binary patch) |
 | FreeBSD `linux_idr.c`: no `sched_pin/unpin` in `idr_preload` (applied by build-core.sh) | malloc inside the critical section panicked (HONOR `0x6edf0`) |
@@ -53,6 +54,7 @@ Refuses to run when ArcXe owns the GPU (ArcMTL test boot).
 | Async panel copy worker (thread_call): composite wait → vblank → copy → `signalTransactionInterrupt` | `nvaccel_xe_async_copy`, `xe_copy_hold`, `xe_copy_*` |
 | **Zero-copy flip**: frame pages → GGTT slot → `PLANE_SURF` (0x7019c + pipe·0x1000), clflush first, wait for the frame counter (0x70040) to latch, plane sent home to the firmware framebuffer on any fallback / pipe free | `nvaccel_xe_flip`, `xe_flip_clflush`, `xe_flips`, `xe_flip_miss`, `xe_flip_fail`, `xe_flip_home` |
 | **K9b**: the flip worker waits for surface-ready **or** GT idle (`xgFlipQuery`), polled every 0.5 ms, bounded by `xe_idle_ms` (40) | `nvaccel_xe_k9`, `xe_idle_ms`, `xe_k9_free/mark/idle/forced`, `xe_k9_max_us` |
+| **k22 late-frame floor** (ArrowWhatever 0035/0036's idea, own code): a composite still running `xe_boost_us` (3000) after the worker took its frame raises the GPU clock floor; it goes back `xe_boost_hold_ms` (150) after the last late frame. Needs `surface_gpu_on=1` (xe-up --fast) | `nvaccel_xe_boost_us`, `xe_boost_hold_ms`, `xe_boost_mhz`, `xe_late`, `xe_boosts`, `xe_boost_on`, `xe_boost_floor`, `xe_boost_fail` |
 
 ### Plugin (NVMTLDriver)
 | Change | Why |

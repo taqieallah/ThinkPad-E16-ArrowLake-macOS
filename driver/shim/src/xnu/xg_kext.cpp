@@ -192,6 +192,12 @@ XeGfxResident::callPlatformFunction(const OSSymbol *name, bool wait, void *p1, v
 		*(int *)p1 = xg_i915_idle();
 		return kIOReturnSuccess;
 	}
+	/* E16 k22 "xgGtMin" (mhz: > 0 raise the GT clock floor, 1 = the maximum; 0 = the previous floor back, -, -,
+	 * int *result: the floor in force in MHz or -errno): the accelerator's late-frame boost. Thread context only. */
+	if (name && name->isEqualTo("xgGtMin") && p4) {
+		*(int *)p4 = xg_i915_gt_boost((int)(intptr_t)p1);
+		return kIOReturnSuccess;
+	}
 	/* "xgTrace" (const char *line): XeGfxAccel's state, stored with the console trace (thread context only) */
 	if (name && name->isEqualTo("xgTrace") && p1 && gLogLock) {
 		IOInterruptState is = IOSimpleLockLockDisableInterrupt(gLogLock);
