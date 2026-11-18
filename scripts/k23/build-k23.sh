@@ -49,7 +49,8 @@ else
 fi
 B=$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU
 [ -f "$B" ] || { echo "STOP: no $B"; exit 1; }
-strings -a "$B" | grep -q "7d51" || { echo "STOP: the built driver has no 7d51 in its force_probe list"; exit 1; }
+# (grep on the file itself: "strings | grep -q" fails under pipefail when grep stops at the first match)
+LC_ALL=C grep -aq "fd81,7d51,7dd1" "$B" || { echo "STOP: the built driver has no 7d51 in its force_probe list"; exit 1; }
 echo "NMXGPU: $(stat -f %z "$B") bytes, force_probe has 7d51"
 
 log "5/6 MeowXE3 $REL release package"
