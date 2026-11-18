@@ -39,6 +39,19 @@ move the aerial videos away (`/Library/Application Support/com.apple.idleassetsd
 wallpaper store (`~/Library/Application Support/com.apple.wallpaper/Store/Index.plist` -> Desktop), screen saver off.
 If that fixes it: video decode on ARL is a bug to report / to keep off (allow list `nvmtl-allow.txt` without `*`).
 
+**Results 18:00-18:15:** caches reset (`k23-reset-caches.sh`, bootcap removed) -> got in, froze while moving over the Dock.
+fbflags 809 (no flips) -> no hard freeze, but the panel updates only every ~30 s (only ~10 `iop` panel transactions in
+the boot), cursor visible only over the menu bar, stale window frames from the open animation, windows drawn empty.
+NVRAM has no NullMoth state left behind; no `/Users/Shared/nmx-flight.log`.
+**MeowXE3 docs:** WCL had the same "whole Mac froze seconds later, no log" bring-up bug; their tool is boot-arg
+`nmxtrace=1`: GPU interrupt heartbeat in NVRAM `nullmoth-gpu-hb` (every 2 s for 60 s from the first interrupt:
+`t= irqs= rate=`) and an interrupt-storm guard (>50000/s disables the GPU interrupt, notes "storm" in the same
+variable). Both only with nmxtrace>0. Also FINDINGS: 0100 skips the DSB with 0x400 (DSB completion never came on WCL),
+0107 removed GuC min/max queries that hung the render engine.
+**Now on the stick:** config.plist = fbflags 1833 + `nmxtrace=1` (copy `config.plist.trace1833`; previous 809 config
+`config.plist.fb809-1118`). After the next freeze, in a `-nvoff` boot: `nvram nullmoth-gpu-hb` (and `nvram -p`).
+Storm -> the freeze is an unacknowledged interrupt on Arrow Lake (display 14.x / media GT): find the source.
+
 **Tests handed to the user (one at a time, report: froze or not, after how long):**
 1. Remove bootcap: in a `-nvoff` boot `sudo bash /Volumes/1401/xegfx-e16/bootcap/uninstall-bootcap.sh`, then boot the
    driver and use it 5 min.
