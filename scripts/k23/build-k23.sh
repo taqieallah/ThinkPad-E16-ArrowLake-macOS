@@ -93,7 +93,16 @@ old = '  elif [[ " $XE3_OTHER " == *" $id "* ]]; then'
 new = ('  elif [[ " $ARL " == *" $id "* ]]; then warn "GPU 8086:$(echo "$id" | tr a-f A-F) Arrow Lake H - MeowARL (E16 k23), first runs"; CHECK_WARN=1\n'
        + old)
 assert s.count(old) == 1, "installer GPU check changed"
-open(p, "w").write(s.replace(old, new, 1))
+s = s.replace(old, new, 1)
+# OpenCore on a USB stick volume (the E16's "1401": EFI/OC at the root of a plain volume, not a partition named EFI)
+eo = '    [ -n "$MNT_BY_US" ] && diskutil unmount "$dev" >/dev/null 2>&1; MNT_BY_US=""\n  done\n  return 1\n}'
+en = ('    [ -n "$MNT_BY_US" ] && diskutil unmount "$dev" >/dev/null 2>&1; MNT_BY_US=""\n  done\n'
+      '  # E16 k23: OpenCore on a mounted volume (a USB stick such as 1401); MEOWARL_OC=<EFI/OC folder> picks one\n'
+      '  local c; for c in ${MEOWARL_OC:-} /Volumes/*/EFI/OC; do\n'
+      '    [ -f "$c/config.plist" ] && { OC=$c; ESP=$(df "$c" | awk \'NR==2 {print $1}\'); return 0; }; done\n'
+      '  return 1\n}')
+assert s.count(eo) == 1, "installer find_esp changed"
+open(p, "w").write(s.replace(eo, en, 1))
 EOF
 bash -n "$I" && echo "installer accepts 7D51"
 cp "$HERE/k23-collect.sh" "$HERE/README-k23.txt" "$PKG/"
