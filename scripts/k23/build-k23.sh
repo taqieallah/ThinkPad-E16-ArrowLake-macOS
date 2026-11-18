@@ -105,6 +105,20 @@ assert s.count(eo) == 1, "installer find_esp changed"
 open(p, "w").write(s.replace(eo, en, 1))
 EOF
 bash -n "$I" && echo "installer accepts 7D51"
+# a package copied through the FAT stick carries AppleDouble files (._Info.plist ...): inside a kext they break its
+# code seal ("a sealed resource is missing or invalid"). The driver install drops them and the copies' xattrs.
+python3 -I - "$PKG/payload/install-meowxe3.sh" <<'EOF'
+import sys
+p = sys.argv[1]; s = open(p).read()
+a = '[ -f "$HERE/MeowXE3.kext/Contents/MacOS/MeowXE3" ] || { echo "MeowXE3.kext missing next to this script"; exit 1; }\n'
+b = a + ('# E16 k23: AppleDouble files from a FAT copy (._*) out of the payload; they break the kexts\' and bundles\' seals\n'
+         'find "$HERE" -name "._*" -delete 2>/dev/null; true\n')
+c = 'rm -rf $K && cp -R "$HERE/MeowXE3.kext" $E/ || { echo "copy failed"; exit 1; }\n'
+d = c + 'find $K -name "._*" -delete 2>/dev/null; xattr -cr $K 2>/dev/null   # E16 k23: nothing but the bundle in the seal\n'
+assert s.count(a) == 1 and s.count(c) == 1, "install-meowxe3.sh changed"
+open(p, "w").write(s.replace(a, b, 1).replace(c, d, 1))
+EOF
+bash -n "$PKG/payload/install-meowxe3.sh" && echo "driver install drops AppleDouble files"
 cp "$HERE/k23-collect.sh" "$HERE/README-k23.txt" "$PKG/"
 echo "$VER $(date '+%F %T') MeowXE3 $MEOW_COMMIT + arl-on-xe; NMXGPU $(shasum -a 256 "$B" | cut -c1-12)" > "$PKG/MeowARL-VERSION.txt"
 
