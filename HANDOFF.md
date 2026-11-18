@@ -1,7 +1,62 @@
-# HANDOFF: where the E16 work stands (2026-11-18 06:00 Cairo)
+# HANDOFF: where the E16 work stands (2026-11-18 11:45 Cairo)
 
 > To continue from another device: open this file. The Arabic summary is at the end.
+> **Start with "CURRENT STATE" just below: it supersedes the older "Next steps" further down.**
 > The previous handoff (old XeGfx stack, k22, measurements from 2026-11-02) is in git history: `git show e708242:HANDOFF.md`.
+
+## CURRENT STATE (2026-11-18 11:45 Cairo) - read this first
+**Where we are:** macOS 26.7.3 (25G342), MeowARL (MeowXE3 1.0.71 = NMXGPU xe on 7D51) installed, fbflags 1833.
+The desktop came up on the panel once permissions were fixed (see the 11:00 update below), but now **every boot with
+the driver freezes the WHOLE machine 1-2 minutes after boot/login** (no mouse, no touchpad, caps lock dead; power
+button needed). No panic is written for these freezes.
+
+**Evidence (stick: `xegfx-e16/logs/lastwords-1118-013157/`, `bootcap-1118-012303/`, `meowarl-1118-012320/`):**
+- Unfiltered 3 h system log (`syslog-3h.txt.gz`, 4.36 M lines). Boots with the driver and where their log stops:
+  | boot | log stops | after |
+  |---|---|---|
+  | 00:36:42 | survived (the good session: perf/ws-sample measured, aerial wallpaper chosen ~00:57) | - |
+  | 01:00:51 | 01:01:59 | ~70 s |
+  | 01:03:48 | 01:05:22 | ~95 s |
+  | 01:14:29 | 01:16:40 | ~130 s |
+  | 01:18:05 | 01:19:12 | ~67 s |
+- The log just stops (last lines are ordinary: Wi-Fi scans, NVMTL pipeline/cache hits in WindowServer, an occasional
+  "timed out fence", "NullMoth GPU: wiring ... for writing failed (0x2); for reading: 0x0"). No GPU reset/hang/GuC error.
+- **Correlation:** 3 of the 4 freezes happen at/just after the bootcap launchd job runs (boot + ~60 s: ioreg of the
+  NMX objects + a big `log show`). 01:00:51 froze *during* bootcap (its log.txt is 0 bytes); 01:18:05 froze 0.5 s after
+  bootcap's `log show` finished. But the good 00:36 session also ran bootcap -> not proven.
+- The aerial (video) wallpaper the user picked made things much worse; it was changed back to a still picture (in a
+  `-nvoff` boot) before the 01:14 and 01:18 boots, which still froze.
+- Separate issue: **kernel panics at SHUTDOWN in `-nvoff` boots** (`reports/Kernel-2026-11-18-{000554,001426,003044,011112}.panic`):
+  page fault at RIP 0 in `PMHaltWorker::work` (a driver's power-off/halt callback is a NULL function pointer),
+  "System shutdown begun: YES". Not the freeze. Likely a MeowXE3 piece loaded but not started under `-nvoff`; check later.
+- Also seen: `BackgroundShortcutRunner` running a Shortcuts "runshellscript" action thousands of times per session (not ours?).
+
+**Tests handed to the user (one at a time, report: froze or not, after how long):**
+1. Remove bootcap: in a `-nvoff` boot `sudo bash /Volumes/1401/xegfx-e16/bootcap/uninstall-bootcap.sh`, then boot the
+   driver and use it 5 min.
+2. If it still freezes: fbflags 809 (= 1833 without 0x400 flips). Prepared on the stick:
+   `cp /Volumes/1401/EFI/OC/config.plist.fb809 /Volumes/1401/EFI/OC/config.plist` (only line ~2039 differs: `ODA5`).
+   Back to 1833: `config.plist.fb1833-1118`. 1321 copy: `config.plist.bak-fb1321-1118`.
+   (Stray `config.plist.tmp` on the stick = an old 1321 copy, harmless; deleting on the stick needs permission.)
+3. Further ideas if both still freeze: fbflags without 0x20 (IOGraphics power) / with 0x4 (no power); disable the Metal
+   plug-in for everything but WindowServer (`/Library/GPUBundles/nvmtl-allow.txt`, currently has `*`); ask upstream
+   (MeowXE3 / NullMoth issues) about hard freezes on graphics 12.70+/Meteor Lake GT; read MeowXE3's flight log
+   `/Users/Shared/nmx-flight.log` from a frozen boot (it is written by the kext and may survive).
+
+**Scripts added today (all in `scripts/k23/`, on the stick in `xegfx-e16/MeowARL/`, md5-verified):**
+`k23-metal-check.sh` (GPUBundles modes + signature page sizes), `fix-gpubundle-perms.sh` (THE fix: 755/644 modes),
+`k23-perf.sh` (CPU users, clocks, NMXAccel counters while moving windows), `cpu-measure.sh` (copied from k22),
+`k23-ws-sample.sh` (sample WindowServer + busiest app, fence timeouts, 15 min of messages),
+`k23-lastwords.sh` (whole system log 3 h gz + hang/crash/panic reports).
+
+**Answers already given to the user:**
+- "2048 MB" in About This Mac = `VRAM,totalMB` set by the driver on GFX0 (no DeviceProperties in config.plist);
+  cosmetic for a shared-memory iGPU. Could be overridden with DeviceProperties or in the driver later; low priority.
+- 60 fps: panel is 60 Hz; WindowServer delivered ~30 fps while moving windows. Plan: let shader caches warm up, then
+  try `sudo sysctl -w debug.nvaccel_iop_flip=1` (zero-copy), then a GPU min-clock floor like k22. Not tried yet because
+  of the freezes.
+- Bridge note: `device_commit_files` to `/Volumes/1401/...` only works while the stick is plugged into the M5; if macOS
+  says "denied access" the stick is in the laptop. The bridge was disconnected at 11:45.
 
 ## Setup
 - **The user:** Egyptian Arabic, **always reply in Arabic**.
@@ -204,3 +259,12 @@ MeowXE3 targets Xe3. We rebuild its kernel driver with Arrow Lake H moved from i
 - **لو لسه مش شغال:** رجّع 1321، وشغّل `arm-pipetest.sh`، واعمل بوت بالتعريف واستنى دقيقتين، وبعدين انقل النتايج.
 - E16ConsoleRange لازم يفضل شغال على طول، ومتركّبش LegionCpuPower.
 - تجربة AppleParavirtGPU/Reims متوقفة حاليًا.
+
+### تحديث 18/11 الساعة 11:45
+- الصورة اشتغلت بعد ما ظبطنا صلاحيات ملفات الـ Metal (`fix-gpubundle-perms.sh`)، والمشكلة مكانتش نسخة macOS.
+- المعالج سليم، وبيوصل لـ 3.58 جيجاهرتز. البطء كان من بناء الـ shaders لأول مرة، ومن نسخ الفريمات للشاشة بالمعالج.
+- **المشكلة دلوقتي:** كل بوت بالتعريف الجهاز كله بيقف بعد دقيقة أو اتنين، ومن غير أي رسالة خطأ.
+- **التجارب الجاية بالترتيب:**
+  1. نشيل bootcap.
+  2. لو لسه بيقف: نجرّب fbflags 809 (من غير الـ flips). الـ config بتاعه جاهز على الفلاشة.
+- فيه كمان panic وقت الإطفاء في البوت من غير تعريف. دي مشكلة تانية وهنبصلها بعدين.
