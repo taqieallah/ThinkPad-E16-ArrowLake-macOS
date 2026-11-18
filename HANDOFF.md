@@ -1,10 +1,34 @@
-# HANDOFF: where the E16 work stands (2026-11-18 11:45 Cairo)
+# HANDOFF: where the E16 work stands (2026-11-18 19:15 Cairo)
 
 > To continue from another device: open this file. The Arabic summary is at the end.
 > **Start with "CURRENT STATE" just below: it supersedes the older "Next steps" further down.**
 > The previous handoff (old XeGfx stack, k22, measurements from 2026-11-02) is in git history: `git show e708242:HANDOFF.md`.
 
-## CURRENT STATE (2026-11-18 11:45 Cairo) - read this first
+## LATEST (2026-11-18 19:15 Cairo) - read this first, then CURRENT STATE below
+- **1.0.72 is built and installed** (kmutil: `com.meowxe3.MeowXE3 (1.0.72)`; Accel/AGDC still 1.0.12) and the kernel
+  log confirms `[drm] WCL/ARL bring-up: PSR 0, FBC 0, DC 0`. config.plist on the stick: fbflags 1833, no nmxtrace.
+  `nvmtl-allow.txt` was restored to `*` (backup `nvmtl-allow.txt.bak` on the laptop).
+- **Still freezes hard** (whole Mac, no log, no panic) - the user: "it worked a bit, then I opened System Settings, which
+  had many icons not rendered yet, and it froze". Pattern over all tests: the freeze comes with a burst of new GPU work
+  (Dock magnification, the lock-screen clock's minute animation, Settings' icons), not at a fixed time.
+- Last kernel lines of that boot (`logs/meowarl-1118-091001/kernel.txt`, boot 09:02:22, last line 09:04:01): a burst of
+  16x `NullMoth GPU: wiring 0x... + 32 pages for writing failed (0x2); for reading: 0x0` within 60 ms at 09:03:54
+  (user pages the GPU maps that could only be wired read-only; 32 pages = 128 KB, icon-sized), then
+  `createUserGPUTask`, then silence. Worth reading that fallback in NMXGPU (xkpi user-page wiring): what the GPU may
+  write into a page wired only for reading.
+- `k23-lastwords.sh` was NOT run after this freeze (only the 01:31 one exists).
+- PSR/FBC/DC off did not fix the freeze; whether it fixed the stale-picture problem of 809 is untested.
+**Next ideas, in order:**
+1. Read NMXGPU's user-page wiring fallback (the "for writing failed ... for reading" path) and the GPU fault /
+   GuC reset handling on graphics 12.74; get `logs` of a freeze with `k23-lastwords.sh` right after it.
+2. Make the GPU reset survivable: check whether xe's GuC-based engine reset works under xkpi (a hung render job
+   should be reset by the GuC, not freeze the Mac; a whole-machine freeze suggests a CPU stuck with interrupts off or an
+   MMIO read that never completes - e.g. a GT/media-GT register read in RC6 without forcewake).
+3. Open an issue at cuadra8998/MeowXE3 (the user has to post it): Arrow Lake H 7D51 on xe 6.14 via MeowXE3, desktop
+   works, hard freezes under bursts of GPU work, PSR/FBC/DC off did not help, logs attached.
+4. Daily use meanwhile: boot "MeowXE3: start once without driver" (stable, no acceleration).
+
+## CURRENT STATE (2026-11-18 11:45 Cairo)
 **Where we are:** macOS 26.7.3 (25G342), MeowARL (MeowXE3 1.0.71 = NMXGPU xe on 7D51) installed, fbflags 1833.
 The desktop came up on the panel once permissions were fixed (see the 11:00 update below), but now **every boot with
 the driver freezes the WHOLE machine 1-2 minutes after boot/login** (no mouse, no touchpad, caps lock dead; power
@@ -308,3 +332,9 @@ MeowXE3 targets Xe3. We rebuild its kernel driver with Arrow Lake H moved from i
   1. نشيل bootcap.
   2. لو لسه بيقف: نجرّب fbflags 809 (من غير الـ flips). الـ config بتاعه جاهز على الفلاشة.
 - فيه كمان panic وقت الإطفاء في البوت من غير تعريف. دي مشكلة تانية وهنبصلها بعدين.
+
+### تحديث 18/11 الساعة 7:15 بالليل
+- عملنا نسخة 1.0.72 من التعريف، وفيها PSR وFBC وDC5/DC6 مقفولين على كارتنا. اتركّبت، واللوج بيأكد إنهم اتقفلوا.
+- **الفريز لسه موجود.** بيحصل لما الكارت ياخد شغل كتير مرة واحدة: الدوك، أو حركة الساعة، أو أيقونات الإعدادات.
+- قبل الفريز بثانية التعريف بيكتب رسايل كتير إن صفحات ذاكرة الكارت محتاجها متقفلة على القراءة بس. دي أول حاجة نبص عليها.
+- **لحد ما يتحل:** استخدم "start once without driver" للاستخدام اليومي.
