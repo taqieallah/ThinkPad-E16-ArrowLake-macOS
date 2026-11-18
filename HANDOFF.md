@@ -127,6 +127,23 @@ MeowXE3 targets Xe3. We rebuild its kernel driver with Arrow Lake H moved from i
   - **Reading:** WindowServer composites, but no display pipe is bound to `NMXGPUFB` (the scanout gate is closed), so nothing reaches the panel. 0x200 is the path that binds it, and that path hits the CoreDisplay assert.
 - **Why updating macOS is the main suspect:** MeowXE3 was tested on 26.7.3. CoreDisplay's accel-head path on 26.1 may differ (mode 0x0 / no mode info, missing AGDC).
 
+## UPDATE 2026-11-18 11:00 Cairo - the desktop works
+- Updated to **macOS 26.7.3 (25G342)**: the 1833 CoreDisplay assert stayed, so the OS version was NOT the cause.
+- **Real cause:** `/Library/GPUBundles` was installed `rwx------` (FAT modes carried over by ditto), so WindowServer
+  (`_windowserver`) logged "Cannot find executable for CFBundle NVMTLDriver.bundle" and CoreDisplay asserted.
+  `scripts/k23/fix-gpubundle-perms.sh` (dirs 755, Mach-O 755, rest 644) fixed it; build-k23.sh's installer patch now
+  normalises modes in its local copy. The console's "code signature page shift: 14" lines are noise (also without the driver).
+- **Now:** fbflags 1833, desktop on the panel, 1920x1200, brightness works, About This Mac shows "Intel Graphics 2048 MB".
+- **Slow:** `k23-perf.sh` / `k23-ws-sample.sh` (logs `perf-1118-004635`, `ws-1118-005110`, `cpu-measure-1118-004728.txt`):
+  - CPU is fine: all cores reach 3.58 GHz under load (CpuTscSync only).
+  - WindowServer ~110-130 % CPU, mostly **NVMTL compiling shaders** (libnvmtl_translate AIR->SPIR-V): `fc cache: miss
+    fixed_frag_lph_cph ~700 KB 4-9 s each`, aircache 1837 misses on first use; caches in
+    `/var/folders/.../C/WindowServer/nvmtl/`. CoreAnimation "timed out fence" / "synchronize timed out" cluster while
+    apps compile. The second boot was already faster -> mostly warm-up; re-measure after a few boots.
+  - Frames: CPU copy to the panel ~2 ms/frame (`nvaccel_iop_copy_us`), ~30 fps while moving; zero-copy flip not used
+    (`debug.nvaccel_iop_flip=0`, `iop_flips=0`). Next test: `sudo sysctl -w debug.nvaccel_iop_flip=1` live (reboot undoes).
+  - 2048 MB VRAM is only the advertised number (shared memory).
+
 ## Next steps (in order)
 1. **During the macOS update** (several reboots): avoid booting the driver half way.
    - Either remove `nmxintel=1` from boot-args in config.plist for the update, or pick "start once without driver" at every reboot. The first is safer: the updater reboots on its own.
