@@ -31,6 +31,14 @@ button needed). No panic is written for these freezes.
   "System shutdown begun: YES". Not the freeze. Likely a MeowXE3 piece loaded but not started under `-nvoff`; check later.
 - Also seen: `BackgroundShortcutRunner` running a Shortcuts "runshellscript" action thousands of times per session (not ours?).
 
+**User (11:47): the freezes started right after he picked an animated (aerial) wallpaper.** Main suspect now: the
+aerial is still playing somewhere (lock/login screen, other Spaces, screen saver) and its HEVC video decode
+(VTDecoderXPCService -> NVMTLDriver's libnvdec_hevc/h264 on xe) hard-freezes the GPU/machine. In the 01:03 boot
+WallpaperAgent was active until 01:05:19, the freeze at 01:05:22. Test 0 given to the user (in a `-nvoff` boot):
+move the aerial videos away (`/Library/Application Support/com.apple.idleassetsd/Customer` -> Desktop), reset the
+wallpaper store (`~/Library/Application Support/com.apple.wallpaper/Store/Index.plist` -> Desktop), screen saver off.
+If that fixes it: video decode on ARL is a bug to report / to keep off (allow list `nvmtl-allow.txt` without `*`).
+
 **Tests handed to the user (one at a time, report: froze or not, after how long):**
 1. Remove bootcap: in a `-nvoff` boot `sudo bash /Volumes/1401/xegfx-e16/bootcap/uninstall-bootcap.sh`, then boot the
    driver and use it 5 min.
