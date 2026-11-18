@@ -16,18 +16,25 @@ log() { printf '\n>>> %s\n' "$*"; }
 need() { command -v "$1" >/dev/null || { echo "STOP: missing $1"; exit 1; }; }
 need git; need python3; need rsync; need curl; need ditto; need codesign
 xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1 || { echo "STOP: Command Line Tools missing: xcode-select --install"; exit 1; }
-SDK=""; xcrun --sdk macosx26.5 --show-sdk-path >/dev/null 2>&1 && SDK=macosx26.5   # MeowXE3 builds on the 26 SDK
-echo "SDK: ${SDK:-default $(xcrun --sdk macosx --show-sdk-version)}"
+# MeowXE3 builds on the 26 SDK: use 26.x when the Mac has one (xcrun does not know CLT SDKs by version name, so by path)
+SDK=""; for d in /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26*.sdk \
+    /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26*.sdk; do [ -d "$d" ] && { SDK=$d; break; }; done
+if [ -n "$SDK" ]; then export SDKROOT=$SDK; fi
+echo "SDK: ${SDK:-default $(xcrun --sdk macosx --show-sdk-version) (no 26.x SDK found)}"
 mkdir -p "$ROOT"
 
 log "1/6 MeowXE3 sources ($MEOW_COMMIT)"
 M=$ROOT/MeowXE3-repo
 [ -d "$M/.git" ] || git clone -q https://github.com/cuadra8998/MeowXE3.git "$M"
-git -C "$M" fetch -q origin && git -C "$M" -c advice.detachedHead=false checkout -q -f "$MEOW_COMMIT"
+git -C "$M" fetch -q origin && git -C "$M" -c advice.detachedHead=false checkout -q -f "$MEOW_COMMIT" && git -C "$M" clean -qfd
 
 log "2/6 NMXGPU sources at MeowXE3's pins + its patches (setup-nmxgpu-wcl.sh)"
 if [ -f "$SRC/xkpi/.k23-setup-done" ] && [ "${FRESH:-0}" != 1 ]; then echo "already set up (FRESH=1 redoes it)"
-else bash "$M/patches/nmxgpu/setup-nmxgpu-wcl.sh"; touch "$SRC/xkpi/.k23-setup-done"; fi
+else
+  python3 -I "$HERE/fix-meow-patches.py" "$M"     # 0104 repeats ericek's drm-kmod hunk: git refuses it as published
+  # the setup's fetch restores changed files but keeps files earlier patches added: start drm-kmod clean
+  [ -d "$SRC/kpi/drm-kmod/.git" ] && { git -C "$SRC/kpi/drm-kmod" reset -q --hard; git -C "$SRC/kpi/drm-kmod" clean -qfdx; }
+  bash "$M/patches/nmxgpu/setup-nmxgpu-wcl.sh"; touch "$SRC/xkpi/.k23-setup-done"; fi
 
 log "3/6 Arrow Lake H on xe"
 python3 -I "$HERE/arl-on-xe.py" "$SRC" $SDK

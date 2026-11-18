@@ -9,7 +9,7 @@ forced; i915 lists the same ids and probes them by default. So:
   1. xkpi/override/xe/nmx_xe_module.c: 7d51,7dd1 appended to NMX_XE_FORCE_PROBE.
   2. drm-kmod i915_pci.c: INTEL_ARL_IDS -> INTEL_ARL_U_IDS + INTEL_ARL_S_IDS (Arrow Lake H left out), so the two
      drivers never claim the same device.
-  3. with [sdk] (e.g. macosx26.5): the build scripts use that SDK instead of the default one.
+  3. with [sdk] (an SDK path, or a name such as macosx26.5): the build scripts use it instead of the default SDK.
 Idempotent; exits non-zero if a target text is missing.
 """
 import pathlib
@@ -53,7 +53,8 @@ if sdk:
     n = 0
     for f in list((src / "xkpi").glob("*.sh")) + list((src / "xkpi/kext").glob("*.sh")):
         t = f.read_text()
-        u = t.replace("xcrun --sdk macosx --show-sdk-path", f"xcrun --sdk {sdk} --show-sdk-path")
+        # a path (/.../MacOSX26.5.sdk) is used as it is; a name (macosx26.5) through xcrun
+        u = t.replace("$(xcrun --sdk macosx --show-sdk-path)", sdk if sdk.startswith("/") else f"$(xcrun --sdk {sdk} --show-sdk-path)")
         if u != t:
             f.write_text(u); n += 1
     print(f"SDK {sdk} in {n} build scripts")
