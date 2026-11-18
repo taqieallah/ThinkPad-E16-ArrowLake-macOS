@@ -112,6 +112,9 @@ hn = (ho + '# E16 k23: from a FAT (msdos) volume such as the stick: copy the pac
       '  L=/Users/Shared/MeowARL-run; echo "MeowARL: copying the package off the stick to $L ..."\n'
       '  rm -rf "$L" && ditto --norsrc --noextattr --noqtn "$HERE" "$L" || { echo "copy to $L failed"; exit 1; }\n'
       '  find "$L" -name "._*" -delete 2>/dev/null; xattr -cr "$L" 2>/dev/null\n'
+      '  # FAT shows every file as rwx------: WindowServer (_windowserver) could not read the Metal plug-in -> give normal modes\n'
+      '  find "$L" -type d -exec chmod 755 {} + ; find "$L" -type f -exec chmod 644 {} +\n'
+      '  find "$L" -type f -exec sh -c \'file -b "$1" | grep -q Mach-O && chmod 755 "$1"\' _ {} \\;\n'
       '  MEOWARL_LOCAL=1 exec bash "$L/$(basename "$0")" "$@"\n'
       'fi\n')
 assert s.count(ho) == 1, "installer HERE line changed"
