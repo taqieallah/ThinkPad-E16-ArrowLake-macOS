@@ -134,6 +134,21 @@ assert s.count(a) == 1 and s.count(c) == 1, "install-meowxe3.sh changed"
 open(p, "w").write(s.replace(a, b, 1).replace(c, d, 1))
 EOF
 bash -n "$PKG/payload/install-meowxe3.sh" && echo "driver install drops AppleDouble files"
+# the laptop has no Command Line Tools (fresh macOS, maybe offline): dwarfdump there is only an installer stub. The kext's
+# UUID is read here, on the build Mac, and the install checks the collection against that file.
+dwarfdump --uuid "$K/Contents/MacOS/MeowXE3" | awk '{print $2; exit}' > "$PKG/payload/MeowXE3.uuid"
+grep -qE '^[0-9A-F-]{36}$' "$PKG/payload/MeowXE3.uuid" || { echo "STOP: no UUID for MeowXE3"; exit 1; }
+python3 -I - "$PKG/payload/install-meowxe3.sh" <<'EOF'
+import sys
+p = sys.argv[1]; s = open(p).read()
+a = "WANT=$(dwarfdump --uuid $K/Contents/MacOS/MeowXE3 | awk '{print $2}')\n"
+b = ('# E16 k23: the UUID comes from the build Mac (no Command Line Tools needed here)\n'
+     'WANT=$(cat "$HERE/MeowXE3.uuid" 2>/dev/null)\n'
+     '[ -n "$WANT" ] || WANT=$(dwarfdump --uuid $K/Contents/MacOS/MeowXE3 | awk \'{print $2}\')\n')
+assert s.count(a) == 1, "install-meowxe3.sh UUID line changed"
+open(p, "w").write(s.replace(a, b, 1))
+EOF
+bash -n "$PKG/payload/install-meowxe3.sh" && echo "install checks the UUID from MeowXE3.uuid ($(cat "$PKG/payload/MeowXE3.uuid"))"
 cp "$HERE/k23-collect.sh" "$HERE/README-k23.txt" "$PKG/"
 echo "$VER $(date '+%F %T') MeowXE3 $MEOW_COMMIT + arl-on-xe; NMXGPU $(shasum -a 256 "$B" | cut -c1-12)" > "$PKG/MeowARL-VERSION.txt"
 
