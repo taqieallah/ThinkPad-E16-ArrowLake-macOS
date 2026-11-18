@@ -11,7 +11,7 @@ export NULLMOTH_BUILD_ROOT=${NULLMOTH_BUILD_ROOT:-$HOME/nmx}
 ROOT=$NULLMOTH_BUILD_ROOT; SRC=$ROOT/build/gpu-src; OUT=$ROOT/out
 MEOW_COMMIT=fdb56f4                     # MeowXE3 main on 2026-11-17 (1.0.12 + hand-off)
 REL=v1.0.12; RELZIP=MeowXE3-1.0.12.zip
-PKG=$HOME/Desktop/MeowARL; VER=1.0.71   # 1.0.12 + Arrow Lake
+PKG=$HOME/Desktop/MeowARL; VER=1.0.72   # 1.0.12 + Arrow Lake (1.0.72: PSR/FBC/DC off on display 14)
 log() { printf '\n>>> %s\n' "$*"; }
 need() { command -v "$1" >/dev/null || { echo "STOP: missing $1"; exit 1; }; }
 need git; need python3; need rsync; need curl; need ditto; need codesign
@@ -41,7 +41,8 @@ python3 -I "$HERE/arl-on-xe.py" "$SRC" $SDK
 
 log "4/6 build NMXGPU (log: $SRC/xkpi/k23-build.log)"
 cd "$SRC/xkpi"
-if [ -f "$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU" ] && [ "${REBUILD:-0}" != 1 ] && [ "$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU" -nt override/xe/nmx_xe_module.c ]; then
+if [ -f "$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU" ] && [ "${REBUILD:-0}" != 1 ] && [ "$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU" -nt override/xe/nmx_xe_module.c ] \
+   && LC_ALL=C grep -aq "WCL/ARL bring-up" "$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU"; then
   echo "built already (REBUILD=1 builds again)"
 else
   ./build-guest.sh all "$OUT" 2>&1 | tee k23-build.log | grep -E "compile failures|NMXGPU [0-9a-f]{8}|error:" | tail -20
@@ -51,7 +52,8 @@ B=$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU
 [ -f "$B" ] || { echo "STOP: no $B"; exit 1; }
 # (grep on the file itself: "strings | grep -q" fails under pipefail when grep stops at the first match)
 LC_ALL=C grep -aq "fd81,7d51,7dd1" "$B" || { echo "STOP: the built driver has no 7d51 in its force_probe list"; exit 1; }
-echo "NMXGPU: $(stat -f %z "$B") bytes, force_probe has 7d51"
+LC_ALL=C grep -aq "WCL/ARL bring-up" "$B" || { echo "STOP: the built driver lacks the Arrow Lake safe display (PSR/FBC/DC off)"; exit 1; }
+echo "NMXGPU: $(stat -f %z "$B") bytes, force_probe has 7d51, PSR/FBC/DC off on Arrow Lake"
 
 log "5/6 MeowXE3 $REL release package"
 R=$ROOT/release; mkdir -p "$R"

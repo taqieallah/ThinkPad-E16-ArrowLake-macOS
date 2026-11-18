@@ -9,7 +9,8 @@ forced; i915 lists the same ids and probes them by default. So:
   1. xkpi/override/xe/nmx_xe_module.c: 7d51,7dd1 appended to NMX_XE_FORCE_PROBE.
   2. drm-kmod i915_pci.c: INTEL_ARL_IDS -> INTEL_ARL_U_IDS + INTEL_ARL_S_IDS (Arrow Lake H left out), so the two
      drivers never claim the same device.
-  3. with [sdk] (an SDK path, or a name such as macosx26.5): the build scripts use it instead of the default SDK.
+  3. intel_display_device.c: MeowXE3's Wildcat Lake safe display (PSR, FBC, DC5/DC6 off) also on display 14.
+  4. with [sdk] (an SDK path, or a name such as macosx26.5): the build scripts use it instead of the default SDK.
 Idempotent; exits non-zero if a target text is missing.
 """
 import pathlib
@@ -48,6 +49,23 @@ elif s.count(old) == 1:
     p.write_text(s.replace(old, new)); print("i915: Arrow Lake H left out (ARL-U and ARL-S kept)")
 else:
     print(f"MISSING: INTEL_ARL_IDS line in {p}"); fail = 1
+
+# 3. MeowXE3 (0052) keeps PSR, FBC and DC5/DC6 off on Wildcat Lake's display 30.02 only. Arrow Lake H (display 14)
+#    ran with all three on: with flips the whole Mac froze within minutes (no log, no panic), without flips the panel
+#    kept a stale picture and refreshed only a strip under the menu bar (PSR2 selective update). Same safe set here.
+d = src / "kpi/drm-kmod/drivers/gpu/drm/i915/display/intel_display_device.c"
+s = d.read_text()
+old3 = "if (NMX_WCL_SAFE_DISPLAY && DISPLAY_VERx100(display) == 3002) {"
+new3 = "if (NMX_WCL_SAFE_DISPLAY && (DISPLAY_VERx100(display) == 3002 || DISPLAY_VER(display) == 14)) { /* E16 k23: + Arrow Lake H */"
+msg_old, msg_new = '"WCL bring-up: PSR %d, FBC %d, DC %d\\n"', '"WCL/ARL bring-up: PSR %d, FBC %d, DC %d\\n"'
+if new3 in s:
+    print("display: PSR/FBC/DC off on Arrow Lake already")
+elif s.count(old3) == 1:
+    s = s.replace(old3, new3)
+    if s.count(msg_old) == 1: s = s.replace(msg_old, msg_new)
+    d.write_text(s); print("display: PSR, FBC, DC5/DC6 off on Arrow Lake H (display 14) as on Wildcat Lake")
+else:
+    print(f"MISSING: WCL safe-display block in {d}"); fail = 1
 
 if sdk:
     n = 0

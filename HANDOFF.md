@@ -60,6 +60,17 @@ so it is useless here. config.plist put back to `config.plist.fb1833-1118` (1833
 in a `-nvoff` boot; backup `nvmtl-allow.txt.bak`). If the freezes stop, an app's GPU workload (Photos/media analysis,
 Dock, Notes...) hangs the GPU; then add apps back one by one.
 
+**18:33: WindowServer-only Metal still froze at the login window, right after the clock's minute animation.**
+**ROOT-CAUSE CANDIDATE (strong):** MeowXE3 patch 0052 turns PSR, FBC and DC5/DC6 OFF only for display 30.02
+(`NMX_WCL_SAFE_DISPLAY && DISPLAY_VERx100(display) == 3002` in intel_display_device.c). Arrow Lake H (display 14) ran
+with all three ON. The 809 picture (stale screen, only a strip under the menu bar refreshing) is PSR2 selective update;
+hard freezes with flips fit PSR/DC on a port never tested with them. **Fix in 1.0.72:** `arl-on-xe.py` step 3 extends
+the condition to `DISPLAY_VER(display) == 14` and renames the log line to "WCL/ARL bring-up: PSR %d, FBC %d, DC %d";
+`build-k23.sh` VER=1.0.72, rebuilds when the binary lacks that string and stops if the built driver lacks it.
+To do: on the M5 `git -C ~/src/xe-e16/e16-repo pull && bash ~/src/xe-e16/e16-repo/scripts/k23/build-k23.sh` (stick in),
+then on the laptop in a `-nvoff` boot the installer `[2] driver only`, then boot with 1833 (config is back on 1833).
+Check the kernel log for "WCL/ARL bring-up: PSR 0, FBC 0, DC 0".
+
 **Tests handed to the user (one at a time, report: froze or not, after how long):**
 1. Remove bootcap: in a `-nvoff` boot `sudo bash /Volumes/1401/xegfx-e16/bootcap/uninstall-bootcap.sh`, then boot the
    driver and use it 5 min.
