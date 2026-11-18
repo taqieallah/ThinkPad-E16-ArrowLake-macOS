@@ -9,6 +9,11 @@ B=/Volumes/1401/xegfx-e16/logs; mkdir -p "$B" 2>/dev/null || B=/Users/Shared
 D=$B/meowarl-$(date +%m%d-%H%M%S); mkdir -p "$D"
 for f in /Users/Shared/nmx-flight.log /Users/Shared/nmx-accel.log /Users/Shared/MeowXE3-install.log; do
   [ -f "$f" ] && cp "$f" "$D/"; done
+# WindowServer / kernel crash reports of the last day (the first WindowServer crash of a boot is the one that matters)
+mkdir -p "$D/crashes"
+find /Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports/Retired -maxdepth 1 -type f \
+  \( -name 'WindowServer*' -o -name 'Kernel*' -o -name '*panic*' \) -mtime -1 -exec cp {} "$D/crashes/" \; 2>/dev/null
+echo "crash reports: $(ls "$D/crashes" | wc -l | tr -d ' ')"
 P='sender == "MeowXE3" OR sender == "MeowXE3Accel" OR sender == "MeowXE3AGDC" OR eventMessage CONTAINS[c] "NullMoth" OR eventMessage CONTAINS "NMX" OR eventMessage CONTAINS[c] "xe 0000" OR eventMessage CONTAINS "[drm]" OR eventMessage CONTAINS "GuC" OR eventMessage CONTAINS "DMC"'
 if [ "${1:-}" = prev ]; then log show --last 3h --predicate "$P" --style compact > "$D/kernel.txt" 2>&1
 else log show --last boot --predicate "$P" --style compact > "$D/kernel.txt" 2>&1; fi
