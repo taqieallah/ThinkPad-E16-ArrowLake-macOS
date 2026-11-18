@@ -102,7 +102,22 @@ en = ('    [ -n "$MNT_BY_US" ] && diskutil unmount "$dev" >/dev/null 2>&1; MNT_B
       '    [ -f "$c/config.plist" ] && { OC=$c; ESP=$(df "$c" | awk \'NR==2 {print $1}\'); return 0; }; done\n'
       '  return 1\n}')
 assert s.count(eo) == 1, "installer find_esp changed"
-open(p, "w").write(s.replace(eo, en, 1))
+s = s.replace(eo, en, 1)
+# started from the FAT stick: run from a clean copy on the Mac's own disk. A FAT volume keeps every file's extended
+# attributes as an AppleDouble file (._name); copied into a kext or bundle they break its code seal.
+ho = 'HERE=$(cd "$(dirname "$0")" && pwd)\n'
+hn = (ho + '# E16 k23: from a FAT (msdos) volume such as the stick: copy the package to local disk without AppleDouble files and\n'
+      '# extended attributes, then run that copy (same arguments; sudo is asked there as usual)\n'
+      'if [ -z "${MEOWARL_LOCAL:-}" ] && mount | grep -q "^$(df "$HERE" | awk \'NR==2 {print $1}\') on .*(msdos"; then\n'
+      '  L=/Users/Shared/MeowARL-run; echo "MeowARL: copying the package off the stick to $L ..."\n'
+      '  rm -rf "$L" && ditto --norsrc --noextattr --noqtn "$HERE" "$L" || { echo "copy to $L failed"; exit 1; }\n'
+      '  find "$L" -name "._*" -delete 2>/dev/null; xattr -cr "$L" 2>/dev/null\n'
+      '  MEOWARL_LOCAL=1 exec bash "$L/$(basename "$0")" "$@"\n'
+      'fi\n')
+assert s.count(ho) == 1, "installer HERE line changed"
+s = s.replace(ho, hn, 1)
+s = s.replace('exec sudo MEOWXE3_FAST="$FAST" bash "$0" "$@"', 'exec sudo MEOWXE3_FAST="$FAST" MEOWARL_LOCAL="${MEOWARL_LOCAL:-}" bash "$0" "$@"', 1)
+open(p, "w").write(s)
 EOF
 bash -n "$I" && echo "installer accepts 7D51"
 # a package copied through the FAT stick carries AppleDouble files (._Info.plist ...): inside a kext they break its

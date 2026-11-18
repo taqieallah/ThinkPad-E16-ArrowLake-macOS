@@ -28,9 +28,12 @@ MeowARL (E16 k23) - MeowXE3 على كارت Arrow Lake بتاع الـ ThinkPad 
        SecureBootModel = Disabled
 
 === 3) على اللابتوب: التركيب ===
-   cp -R /Volumes/1401/xegfx-e16/MeowARL ~/Desktop/
-   sudo bash ~/Desktop/MeowARL/"Install MeowXE3.command" --dry-run     (بيفحص بس، ومبيغيّرش حاجة)
-   sudo bash ~/Desktop/MeowARL/"Install MeowXE3.command"               ثم اختار [1]
+   sudo bash /Volumes/1401/xegfx-e16/MeowARL/"Install MeowXE3.command" --dry-run   (بيفحص بس، ومبيغيّرش حاجة)
+   sudo bash /Volumes/1401/xegfx-e16/MeowARL/"Install MeowXE3.command"             ثم اختار [1]
+   - بيتشغّل من الفلاشة على طول: الأول بينسخ نفسه لـ /Users/Shared/MeowARL-run، وبيشيل ملفات ._ اللي FAT بيعملها
+     (لأنها بتبوّظ توقيع الـ kexts)، وبعدين بيكمّل من النسخة دي.
+   - بيلاقي OpenCore على الفلاشة 1401 لوحده.
+   - لو OpenCore اتعدّل قبل كده، اختار [2] driver only.
    - هيقولك "Arrow Lake H - MeowARL, first runs". ده تحذير عادي، كمّل.
    - قبل ما يعدّل config.plist هيسألك، وبيعمل نسخة احتياطية من EFI في ~/MeowXE3-EFI-backup-<date>.
      التعديلات اللي بيعملها:
@@ -44,8 +47,9 @@ MeowARL (E16 k23) - MeowXE3 على كارت Arrow Lake بتاع الـ ThinkPad 
    - لو الشاشة سودا أو الجهاز وقف:
        1. اعمل ريستارت.
        2. من قايمة OpenCore اختار "MeowXE3: start once without driver"، وبعدها macOS.
-       3. بعد ما يفتح:  sudo bash ~/Desktop/MeowARL/k23-collect.sh prev
-   - لو فتح: شغّل  sudo bash ~/Desktop/MeowARL/k23-collect.sh
+       3. بعد ما يفتح:  sudo bash /Volumes/1401/xegfx-e16/MeowARL/k23-collect.sh prev
+   - قبل الريستارت: لازم E16ConsoleRange.kext يفضل Enabled في config.plist، من غيره البوت بيقف على السطور السودا.
+   - لو فتح: شغّل  sudo bash /Volumes/1401/xegfx-e16/MeowARL/k23-collect.sh
      وجرّب تصغّر وتكبّر الشبابيك وتفتح Mission Control. هل الحركة سلسة؟
    - ابعتلي مجلد xegfx-e16/logs/meowarl-* من الفلاشة.
 
