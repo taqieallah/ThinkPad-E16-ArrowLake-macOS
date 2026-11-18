@@ -52,6 +52,14 @@ variable). Both only with nmxtrace>0. Also FINDINGS: 0100 skips the DSB with 0x4
 `config.plist.fb809-1118`). After the next freeze, in a `-nvoff` boot: `nvram nullmoth-gpu-hb` (and `nvram -p`).
 Storm -> the freeze is an unacknowledged interrupt on Arrow Lake (display 14.x / media GT): find the source.
 
+**nmxtrace=1 result (18:20):** two boots, normal verbose text then black screen. The log stops inside xe's probe
+(`NMXT xe_device_probe: xe_devcoredump_init`, "GT1: can't init GSC proxy due to missing mei component" just before);
+no "first interrupt delivered", no `nullmoth-gpu-hb`. The checkpoint tracing itself stalls the probe on this machine,
+so it is useless here. config.plist put back to `config.plist.fb1833-1118` (1833, no nmxtrace).
+**Next test given:** Metal plug-in only for WindowServer (remove the `*` line from `/Library/GPUBundles/nvmtl-allow.txt`
+in a `-nvoff` boot; backup `nvmtl-allow.txt.bak`). If the freezes stop, an app's GPU workload (Photos/media analysis,
+Dock, Notes...) hangs the GPU; then add apps back one by one.
+
 **Tests handed to the user (one at a time, report: froze or not, after how long):**
 1. Remove bootcap: in a `-nvoff` boot `sudo bash /Volumes/1401/xegfx-e16/bootcap/uninstall-bootcap.sh`, then boot the
    driver and use it 5 min.
