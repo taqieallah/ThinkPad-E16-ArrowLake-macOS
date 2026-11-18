@@ -15,6 +15,8 @@ driver/ is WTLIntelGfx ff64f83 with the E16 changes applied; its own NOTICE give
 driver/kexts/XeGfxIntelFB/intelfb.cpp is XeGfxIntelFB 0.9.4 (BSD 2-Clause, watchthelight) with E16 changes.
 scripts/0008-e16.patch is ArrowWhatever's 0008-core-ggtt-flip-slots.patch, path-rewritten (see its header).
 The k22 late-frame GPU clock floor follows the idea of ArrowWhatever 0035/0036 (Mountainatic); the code is written for this tree.
+scripts/k23 builds MeowXE3 (cuadra8998, PolyForm Noncommercial 1.0.0, on NullMoth's NMXGPU) from its own sources and release;
+nothing of MeowXE3 or NullMoth is stored in this repository, only the build and test scripts.
 scripts/arc/patch-arcxe-e16.py patches longurara/ArcMTL (PolyForm Noncommercial 1.0.0 for NullMoth-derived parts).
 
 No commercial use of the PolyForm Noncommercial parts. No Apple binaries, firmware or kernel collections.

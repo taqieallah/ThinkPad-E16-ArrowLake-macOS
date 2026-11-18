@@ -1,0 +1,99 @@
+#!/bin/bash
+# On the Mac (M5):   bash build-k23.sh            (30-90 min the first time; safe to run again)
+# K23 = MeowXE3 (cuadra8998: NullMoth's NMXGPU = Linux 6.14 xe on macOS, with NMXAccel, the Metal plugin, ANV, Zink)
+# for the ThinkPad E16's Arrow Lake H (8086:7D51). MeowXE3 ships for Intel Xe3 (Wildcat / Panther Lake); its kernel
+# driver is rebuilt here from the same sources and patches with Arrow Lake H moved from i915 to xe (arl-on-xe.py), and
+# swapped into MeowXE3's release package together with the Meteor Lake GPU firmware Arrow Lake uses.
+# Output: ~/Desktop/MeowARL (installer + payload), also copied to /Volumes/1401/xegfx-e16/MeowARL when the stick is in.
+set -euo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+export NULLMOTH_BUILD_ROOT=${NULLMOTH_BUILD_ROOT:-$HOME/nmx}
+ROOT=$NULLMOTH_BUILD_ROOT; SRC=$ROOT/build/gpu-src; OUT=$ROOT/out
+MEOW_COMMIT=fdb56f4                     # MeowXE3 main on 2026-11-17 (1.0.12 + hand-off)
+REL=v1.0.12; RELZIP=MeowXE3-1.0.12.zip
+PKG=$HOME/Desktop/MeowARL; VER=1.0.71   # 1.0.12 + Arrow Lake
+log() { printf '\n>>> %s\n' "$*"; }
+need() { command -v "$1" >/dev/null || { echo "STOP: missing $1"; exit 1; }; }
+need git; need python3; need rsync; need curl; need ditto; need codesign
+xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1 || { echo "STOP: Command Line Tools missing: xcode-select --install"; exit 1; }
+SDK=""; xcrun --sdk macosx26.5 --show-sdk-path >/dev/null 2>&1 && SDK=macosx26.5   # MeowXE3 builds on the 26 SDK
+echo "SDK: ${SDK:-default $(xcrun --sdk macosx --show-sdk-version)}"
+mkdir -p "$ROOT"
+
+log "1/6 MeowXE3 sources ($MEOW_COMMIT)"
+M=$ROOT/MeowXE3-repo
+[ -d "$M/.git" ] || git clone -q https://github.com/cuadra8998/MeowXE3.git "$M"
+git -C "$M" fetch -q origin && git -C "$M" -c advice.detachedHead=false checkout -q -f "$MEOW_COMMIT"
+
+log "2/6 NMXGPU sources at MeowXE3's pins + its patches (setup-nmxgpu-wcl.sh)"
+if [ -f "$SRC/xkpi/.k23-setup-done" ] && [ "${FRESH:-0}" != 1 ]; then echo "already set up (FRESH=1 redoes it)"
+else bash "$M/patches/nmxgpu/setup-nmxgpu-wcl.sh"; touch "$SRC/xkpi/.k23-setup-done"; fi
+
+log "3/6 Arrow Lake H on xe"
+python3 -I "$HERE/arl-on-xe.py" "$SRC" $SDK
+
+log "4/6 build NMXGPU (log: $SRC/xkpi/k23-build.log)"
+cd "$SRC/xkpi"
+if [ -f "$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU" ] && [ "${REBUILD:-0}" != 1 ] && [ "$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU" -nt override/xe/nmx_xe_module.c ]; then
+  echo "built already (REBUILD=1 builds again)"
+else
+  ./build-guest.sh all "$OUT" 2>&1 | tee k23-build.log | grep -E "compile failures|NMXGPU [0-9a-f]{8}|error:" | tail -20
+  grep -q "compile failures: 0" k23-build.log || { echo "STOP: compile failures - send me $SRC/xkpi/k23-build.log and logs*/*.failed"; exit 1; }
+fi
+B=$OUT/NMXGPU.kext/Contents/MacOS/NMXGPU
+[ -f "$B" ] || { echo "STOP: no $B"; exit 1; }
+strings -a "$B" | grep -q "7d51" || { echo "STOP: the built driver has no 7d51 in its force_probe list"; exit 1; }
+echo "NMXGPU: $(stat -f %z "$B") bytes, force_probe has 7d51"
+
+log "5/6 MeowXE3 $REL release package"
+R=$ROOT/release; mkdir -p "$R"
+if [ ! -f "$R/$RELZIP" ]; then
+  if [ -f "$HOME/Downloads/$RELZIP" ]; then cp "$HOME/Downloads/$RELZIP" "$R/"
+  else curl -fL --retry 3 -o "$R/$RELZIP.part" "https://github.com/cuadra8998/MeowXE3/releases/download/$REL/$RELZIP" && mv "$R/$RELZIP.part" "$R/$RELZIP" \
+    || { echo "STOP: download $RELZIP from https://github.com/cuadra8998/MeowXE3/releases into ~/Downloads, then run this again"; exit 1; }; fi
+fi
+rm -rf "$R/x"; mkdir -p "$R/x"; ditto -x -k "$R/$RELZIP" "$R/x"
+INST=$(find "$R/x" -name "Install MeowXE3.command" -maxdepth 3 | head -1)
+[ -n "$INST" ] || { echo "STOP: no installer in $RELZIP"; exit 1; }
+SRCPKG=$(dirname "$INST")
+[ -f "$SRCPKG/payload/MeowXE3.kext/Contents/MacOS/MeowXE3" ] || { echo "STOP: no payload/MeowXE3.kext in $RELZIP"; exit 1; }
+
+log "6/6 package $PKG"
+rm -rf "$PKG"; ditto "$SRCPKG" "$PKG"
+K=$PKG/payload/MeowXE3.kext; PB=/usr/libexec/PlistBuddy
+echo "release kexts:"; for k in "$K" "$K"/Contents/PlugIns/*.kext; do
+  echo "  $(basename "$k") $($PB -c 'Print :CFBundleVersion' "$k/Contents/Info.plist")"; done
+# the driver: our build, under MeowXE3's name (bundle ids, plug-ins and Info.plist stay MeowXE3's)
+cp "$B" "$K/Contents/MacOS/MeowXE3"
+$PB -c "Set :CFBundleVersion $VER" -c "Set :CFBundleShortVersionString $VER" "$K/Contents/Info.plist"
+rm -rf "$K/Contents/_CodeSignature"; codesign -f -s - "$K" 2>&1 | grep -v "replacing existing" || true
+codesign -v --deep "$K" && echo "signed ad hoc"
+# Arrow Lake's GPU firmware: xe 6.14 asks Meteor Lake's GuC/HuC/GSC by these names, the display Meteor Lake's DMC
+FWS=$ROOT/repos/linux-firmware/i915; FWD=$PKG/payload/firmware/i915; mkdir -p "$FWD"
+n=0; for f in "$FWS"/mtl_guc_70.bin "$FWS"/mtl_huc_gsc.bin "$FWS"/mtl_gsc_*.bin "$FWS"/mtl_dmc.bin; do
+  [ -f "$f" ] && { cp "$f" "$FWD/"; n=$((n+1)); }; done
+[ -f "$FWD/mtl_guc_70.bin" ] && [ -f "$FWD/mtl_dmc.bin" ] || { echo "STOP: Meteor Lake GuC/DMC firmware missing in $FWS"; exit 1; }
+echo "firmware: $n Meteor Lake files"; ls "$FWD"
+# the installer accepts 8086:7D51 (as an untested GPU) and calls this package's version
+I="$PKG/Install MeowXE3.command"
+grep -q '^SUPPORTED="fd80"' "$I" || { echo "STOP: installer's SUPPORTED line changed"; exit 1; }
+python3 -I - "$I" <<'EOF'
+import sys
+p = sys.argv[1]; s = open(p).read()
+s = s.replace('SUPPORTED="fd80"', 'SUPPORTED="fd80"\nARL="7d51 7dd1"   # E16 k23: Arrow Lake H on xe (MeowARL)', 1)
+old = '  elif [[ " $XE3_OTHER " == *" $id "* ]]; then'
+new = ('  elif [[ " $ARL " == *" $id "* ]]; then warn "GPU 8086:$(echo "$id" | tr a-f A-F) Arrow Lake H - MeowARL (E16 k23), first runs"; CHECK_WARN=1\n'
+       + old)
+assert s.count(old) == 1, "installer GPU check changed"
+open(p, "w").write(s.replace(old, new, 1))
+EOF
+bash -n "$I" && echo "installer accepts 7D51"
+cp "$HERE/k23-collect.sh" "$HERE/README-k23.txt" "$PKG/"
+echo "$VER $(date '+%F %T') MeowXE3 $MEOW_COMMIT + arl-on-xe; NMXGPU $(shasum -a 256 "$B" | cut -c1-12)" > "$PKG/MeowARL-VERSION.txt"
+
+if [ -d /Volumes/1401/xegfx-e16 ]; then T=/Volumes/1401/xegfx-e16/MeowARL
+  rm -rf "$T"; mkdir -p "$T"; rsync -rt --exclude '._*' --exclude .DS_Store "$PKG/" "$T/"; dot_clean /Volumes/1401/xegfx-e16 2>/dev/null || true; sync
+  bad=0; while IFS= read -r f; do cmp -s "$PKG/$f" "$T/$f" || { echo "MISMATCH $f"; bad=1; }; done < <(cd "$PKG" && find . -type f ! -name '._*')
+  [ $bad = 0 ] && echo "copied to $T (checked)" || { echo "STOP: the copy on the stick differs - run this again"; exit 1; }
+else echo "stick not in: copy $PKG to /Volumes/1401/xegfx-e16/MeowARL later"; fi
+echo; echo "DONE. On the laptop (fresh macOS): read MeowARL/README-k23.txt"
