@@ -6,10 +6,21 @@
 # then makes a k22 package = the final 1.0.1 package with the two new kexts.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd); W=$HOME/src/xe-e16; WTL=$W/wtl; UP=$HOME/Desktop/xe-update
-R=$W/e16-repo; FINAL=$HOME/Desktop/E16-final/xegfx-e16/final; OUT=$HOME/Desktop/k22
+R=$W/e16-repo; OUT=$HOME/Desktop/k22
+# the final 1.0.1 package: FINAL=<folder> wins, then the usual places, then a search of the home folder and the stick
+FINAL=${FINAL:-}
+if [ -z "$FINAL" ]; then
+  for c in "$HOME/Desktop/E16-final/xegfx-e16/final" /Volumes/1401/xegfx-e16/final "$HOME/Desktop/xegfx-e16/final" "$HOME/E16-final/xegfx-e16/final"; do
+    [ -f "$c/install.sh" ] && grep -q "E16 final 1.0 installed" "$c/install.sh" && { FINAL=$c; break; }; done
+fi
+if [ -z "$FINAL" ]; then
+  FINAL=$(find "$HOME" /Volumes/1401 -maxdepth 6 -name install.sh -path "*final*" 2>/dev/null | while read -r f; do
+    grep -q "E16 final 1.0 installed" "$f" && { dirname "$f"; break; }; done)
+fi
+echo "final 1.0.1 package: ${FINAL:-NOT FOUND}"
 [ -d "$WTL/kexts/XeGfxAccel" ] || { echo "STOP: no driver tree in $WTL"; exit 1; }
 [ -f "$UP/core/build-core.sh" ] || { echo "STOP: no $UP/core/build-core.sh (the script that built final 1.0.1)"; exit 1; }
-[ -f "$FINAL/install.sh" ] || { echo "STOP: no final 1.0.1 package in $FINAL"; exit 1; }
+[ -n "$FINAL" ] && [ -f "$FINAL/install.sh" ] || { echo "STOP: no final 1.0.1 package found (looked in ~/Desktop/E16-final, the stick, ~); run with FINAL=/path/to/final"; exit 1; }
 
 echo ">>> 1/4 repository"
 if [ -d "$R/.git" ]; then git -C "$R" pull -q --ff-only; else git clone -q https://github.com/taqieallah/ThinkPad-E16-ArrowLake-macOS.git "$R"; fi
