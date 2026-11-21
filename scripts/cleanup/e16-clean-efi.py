@@ -2,10 +2,12 @@
 """On the Mac M5 with the stick in:   python3 e16-clean-efi.py [/Volumes/1401/EFI/OC/config.plist] [--apply]
 
 Takes the experiments out of the E16's OpenCore config.plist and leaves a plain OpenCore for macOS:
-  - boot-args: drops nmxintel=, nmxtrace=, -nvoff, reimspci=, apvpatch= (the MeowXE3 / NullMoth / Reims switches);
+  - boot-args: drops nmxintel=, nmxtrace=, -nvoff, reimspci=, apvpatch=, arcxe=, arc_headless=, arcfb= (MeowXE3 /
+    NullMoth / Reims / ArcXe switches);
     keeps everything else (verbose, AMFI, -wegoff, -nmintelfb*, nvrmacpibl, ...).
   - NVRAM: removes nullmoth-fbflags (Add and Delete).
-  - Kernel > Add: removes MeowXE3Boot, ReimsPCIProbe, Apv*/AppleParavirt*, LegionCpuPower, NMX*/NullMoth* entries.
+  - Kernel > Add: removes MeowXE3Boot, ReimsPCIProbe, Apv*/AppleParavirt*, LegionCpuPower, NMX*/NullMoth*, ArcXe/ArcAccel/
+    ArcFB and every E16*Arc* experiment build (E16Trial/Release/QueueN ArcXe/ArcAccel). NMIntelFB (XeGfx's) is left.
     E16ConsoleRange stays (boot hangs on the verbose text without it); WhateverGreen, Lilu, VirtualSMC etc. untouched.
   - Misc > Tools / Entries: removes "MeowXE3: start once without driver" (NullMothSafe.efi) and other NullMoth/MeowXE3 items.
 Without --apply it only prints what it would change. With --apply it first copies config.plist to
@@ -21,7 +23,7 @@ p = plistlib.loads(cfg.read_bytes())
 G = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
 changes = []
 
-DROP_ARG = ("nmxintel=", "nmxtrace=", "reimspci=", "apvpatch=")
+DROP_ARG = ("nmxintel=", "nmxtrace=", "reimspci=", "apvpatch=", "arcxe=", "arc_headless=", "arcfb=")
 nv = p["NVRAM"]["Add"].setdefault(G, {})
 ba = nv.get("boot-args", "")
 kept = [t for t in ba.split() if t != "-nvoff" and not t.startswith(DROP_ARG)]
@@ -34,9 +36,11 @@ dl = p["NVRAM"].get("Delete", {}).get(G, [])
 if "nullmoth-fbflags" in dl:
     changes.append("NVRAM Delete: remove nullmoth-fbflags"); dl.remove("nullmoth-fbflags")
 
-BAD_KEXT = ("MeowXE3", "ReimsPCIProbe", "Apv", "AppleParavirt", "LegionCpuPower", "NMX", "NullMoth")
+BAD_KEXT = ("MeowXE3", "ReimsPCIProbe", "Apv", "AppleParavirt", "LegionCpuPower", "NMX", "NullMoth", "ArcXe", "ArcAccel", "ArcFB")
 ka = p["Kernel"]["Add"]
-keep = [k for k in ka if not k.get("BundlePath", "").startswith(BAD_KEXT)]
+def badk(b):  # E16Trial/E16Release/E16QueueN ArcXe/ArcAccel are the ArcMTL experiment builds; E16ConsoleRange stays
+    return b.startswith(BAD_KEXT) or (b.startswith("E16") and "Arc" in b)
+keep = [k for k in ka if not badk(k.get("BundlePath", ""))]
 for k in ka:
     if k not in keep: changes.append(f"Kernel Add: remove {k.get('BundlePath')} (Enabled={k.get('Enabled')})")
 p["Kernel"]["Add"] = keep

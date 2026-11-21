@@ -12,6 +12,8 @@ export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 APPLY=0; [ "${1:-}" = --apply ] && APPLY=1
 U=${SUDO_USER:-$(stat -f %Su /dev/console)}; H=$(dscl . -read /Users/"$U" NFSHomeDirectory | awk '{print $2}')
 T="$H/Desktop/e16-removed-$(date +%m%d-%H%M%S)"
+case " $(nvram boot-args 2>/dev/null | cut -f2-) " in *" arcxe=1 "*)
+    echo "note: arcxe=1 is in boot-args (ArcXe experiment): fine, its kexts come from OpenCore, e16-clean-efi.py takes them out";; esac
 case " $(nvram boot-args 2>/dev/null | cut -f2-) " in
   *" nmxintel=1 "*) case " $(nvram boot-args | cut -f2-) " in *" -nvoff "*) ;; *)
     echo "STOP: the GPU driver is running (nmxintel=1 without -nvoff). Boot 'MeowXE3: start once without driver' first."; exit 1;; esac;;
@@ -33,7 +35,7 @@ for d in /Library/LaunchDaemons /Library/LaunchAgents "$H/Library/LaunchAgents";
 
 echo "== kexts in /Library/Extensions"
 for k in /Library/Extensions/*.kext; do [ -e "$k" ] || continue
-  case "$(basename "$k")" in MeowXE3*|NMX*|NullMoth*|NVRM*|XeGfx*|Xg*|NMIntelFB*|ReimsPCIProbe*|Apv*|AppleParavirt*|LegionCpuPower*|E16*|ArcMTL*)
+  case "$(basename "$k")" in MeowXE3*|NMX*|NullMoth*|NVRM*|XeGfx*|Xg*|NMIntelFB*|ReimsPCIProbe*|Apv*|AppleParavirt*|LegionCpuPower*|E16*|Arc*)
     take "$k";; esac; done
 
 echo "== Metal / OpenGL plug-ins, firmware, support files"
