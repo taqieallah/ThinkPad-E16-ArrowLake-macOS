@@ -1,8 +1,52 @@
-# HANDOFF: where the E16 work stands (2026-11-18 19:15 Cairo)
+# HANDOFF: where the E16 work stands (2026-11-22 00:15 Cairo)
 
 > To continue from another device: open this file. The Arabic summary is at the end.
 > **Start with "CURRENT STATE" just below: it supersedes the older "Next steps" further down.**
 > The previous handoff (old XeGfx stack, k22, measurements from 2026-11-02) is in git history: `git show e708242:HANDOFF.md`.
+
+## NOW (2026-11-22) - read this first
+**Decision:** MeowXE3/xe on Arrow Lake H is parked (hard freezes under GPU bursts, cause unknown, see LATEST below).
+The user asked for (1) this full handoff and (2) scripts that clean every experiment off the hackintosh. Next goal:
+go back to the **XeGfx (WTLIntelGfx, i915) stack**, which was stable on the E16; its only problem then was the CPU
+stuck near 550 MHz, and on the fresh 26.7.3 install the CPU already reaches 3.58 GHz without help.
+
+**Cleanup (scripts/cleanup/, also attached to the chat; copy to the stick as `xegfx-e16/cleanup/`):**
+1. Laptop, booted "MeowXE3: start once without driver":
+   `sudo bash /Volumes/1401/xegfx-e16/cleanup/e16-clean-laptop.sh` (dry run: lists), then `... --apply`.
+   Moves (never deletes) to `~/Desktop/e16-removed-<time>/`: launchd jobs (bootcap etc.), kexts in /Library/Extensions
+   (MeowXE3, NMX*, NullMoth*, XeGfx*, Xg*, NMIntelFB, ReimsPCIProbe, Apv*, LegionCpuPower, E16*, ArcMTL*), the Metal/GL
+   plug-ins in /Library/GPUBundles (NVMTL, NVKZink, nvmtl, allow lists, XeMTL/ArcMTL), /Library/NullMoth, support
+   folders, /Users/Shared leftovers, every NVMTL shader cache; deletes NVRAM vars nullmoth-*/nmx*/e16cr-*/xegfx*/reims*/apv*;
+   then `kmutil install --update-all`. Bash only (no python on the laptop). Refuses to run while the driver is active.
+2. Mac M5, stick in: `python3 e16-clean-efi.py /Volumes/1401/EFI/OC/config.plist` (dry run), then `--apply`
+   (backup `config.plist.before-clean-<time>`): boot-args without nmxintel=/nmxtrace=/-nvoff/reimspci=/apvpatch=;
+   nullmoth-fbflags out of NVRAM Add/Delete; Kernel>Add without MeowXE3Boot/ReimsPCIProbe/Apv*/LegionCpuPower/NMX*;
+   Misc Tools/Entries without NullMothSafe. **E16ConsoleRange is kept** (verbose boot hangs without it).
+   Tested on a synthetic config (idempotent). The real config was not inspected for this run (stick not on the M5).
+3. Restart normally: plain macOS, no GPU acceleration (boot framebuffer), stable.
+
+**Back to XeGfx (next work, not started):**
+- On the M5: `~/src/xe-e16/wtl` = WTLIntelGfx ff64f83 + our changes (`driver/` in this repo = that tree);
+  `~/Desktop/xe-update/` build scripts (`core/build-core.sh`), final package `~/Desktop/E16-final/xegfx-e16/final`
+  (E16 final 1.0.1, install.sh with --undo), k22 = `scripts/k22/build-k22.sh` (late-frame SLPC floor).
+- Upstream WTLIntelGfx is at **0.0.48** (2026-11-11; readme only since): stage 4 moves the boot framebuffer out of the
+  GuC area (needed on some Meteor Lake; on the E16 our E16ConsoleRange/console-range handling covers the boot fb), runs
+  on 26.7.3. Plan: rebase our changes on 0.0.48 or keep ff64f83+ours (it ran fine), install, measure with
+  `scripts/k22/k22-measure.sh` + `k23-perf.sh` (CPU now fine). Daily start was `sudo bash /Volumes/1401/xegfx-e16/xe-up.sh`.
+- The OpenCore entries XeGfx needs come from the old final package's guide (docs/BUILD-AND-INSTALL.md,
+  docs/HARDWARE-AND-OPENCORE.md); e16-clean-efi.py leaves -nmintelfb*/nvrmacpibl/-wegoff boot-args in place for it.
+
+**Other repos reviewed 2026-11-21/22 (nothing that fixes the freeze):**
+- yusufklncc/intel-gpu-macos-driver 0.1.7: Arc B580/B570 dGPU only; Meteor/Arrow Lake "not yet / not run". Its
+  NullMoth plug-in fixes (blur framebuffer-fetch barriers, icon layer #9, shutdown panic #8) could be ported later.
+  **HybridPM** explicitly skips our CPU model 0xC5 (Arrow Lake H, HWP unit unmeasured). Our measurement: busy cores
+  top out at 3.58 GHz vs 5.1 GHz spec -> if XCPM asks ratio 51 the unit is ~70 MHz (unverified guess). A HybridPM
+  build that reads HWP_CAPABILITIES on 0xC5 would settle it: possible +30-40 % single-core.
+- VedCloud/Meteor-Lake-Xe-LPG-Metal-Graphics (Dell 135U, 7D45, last update 2026-10-30): NullMoth skeleton with an
+  **i915**-based NMXGPU; desktop works, but lists "fence timeouts, publication stalls" open. Everyone who got
+  Meteor/Arrow Lake running uses i915 (XeGfx, VedCloud, ArrowWhatever); xe on these chips (MeowXE3 path) was ours alone.
+- change-48 (HONOR MagicBook Art 14, 255H 7D51) runs a deferred zero-copy flip on his own XeGfx-based stack
+  (github change-48/XEGFX-MIGRATE): worth reading when back on XeGfx.
 
 ## LATEST (2026-11-18 19:15 Cairo) - read this first, then CURRENT STATE below
 - **1.0.72 is built and installed** (kmutil: `com.meowxe3.MeowXE3 (1.0.72)`; Accel/AGDC still 1.0.12) and the kernel
@@ -338,3 +382,10 @@ MeowXE3 targets Xe3. We rebuild its kernel driver with Arrow Lake H moved from i
 - **الفريز لسه موجود.** بيحصل لما الكارت ياخد شغل كتير مرة واحدة: الدوك، أو حركة الساعة، أو أيقونات الإعدادات.
 - قبل الفريز بثانية التعريف بيكتب رسايل كتير إن صفحات ذاكرة الكارت محتاجها متقفلة على القراءة بس. دي أول حاجة نبص عليها.
 - **لحد ما يتحل:** استخدم "start once without driver" للاستخدام اليومي.
+
+### تحديث 22/11: التنضيف والرجوع لـ XeGfx
+- **MeowXE3 متوقف**، والسبب الفريز.
+- **التنضيف خطوتين** (السكريبتات في `scripts/cleanup/`):
+  1. على اللابتوب: `e16-clean-laptop.sh`. بينقل كل التجارب للديسكتوب ومبيمسحش حاجة.
+  2. على الماك M5: `e16-clean-efi.py`. بينضّف config.plist، وبيسيب E16ConsoleRange شغال.
+- **بعدها نرجع لـ XeGfx:** كان مستقر عندنا، وسبب البطء القديم (المعالج على 550 ميجاهرتز) اتحل في الماك الجديد.
