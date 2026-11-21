@@ -22,7 +22,11 @@ stuck near 550 MHz, and on the fresh 26.7.3 install the CPU already reaches 3.58
    (backup `config.plist.before-clean-<time>`): boot-args without nmxintel=/nmxtrace=/-nvoff/reimspci=/apvpatch=;
    nullmoth-fbflags out of NVRAM Add/Delete; Kernel>Add without MeowXE3Boot/ReimsPCIProbe/Apv*/LegionCpuPower/NMX*;
    Misc Tools/Entries without NullMothSafe. **E16ConsoleRange is kept** (verbose boot hangs without it).
-   Tested on a synthetic config (idempotent). The real config was not inspected for this run (stick not on the M5).
+   Tested on a synthetic config (idempotent). Dry run on the real stick (2026-11-22 00:15): the config had changed
+   since 11-18 (another session, backup `config.plist.before-1071-20261120-001833.bak`): MeowXE3Boot already off, no
+   nmxintel=1, but `-nvoff arcxe=1 arc_headless=1` and **E16Queue4ArcXe/E16Queue4ArcAccel ON** (ArcXe experiment builds,
+   plus disabled E16Trial/Release/Queue2/Queue3 Arc entries). The script (updated) removes all of these; NMIntelFB
+   (disabled) is left for XeGfx. Not applied yet: the user runs `--apply` himself.
 3. Restart normally: plain macOS, no GPU acceleration (boot framebuffer), stable.
 
 **Back to XeGfx (next work, not started):**
